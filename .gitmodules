@@ -1,0 +1,3 @@
+[submodule "external_model/lib/MedicalNet"]
+	path = external_model/lib/MedicalNet
+	url = https://github.com/searobbersduck/MedicalNet.git

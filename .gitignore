@@ -12,6 +12,11 @@ __pycache__/
 *.nii.gz
 *.npy
 
+ct_dual_energy_substraction/itk_algo/config
+ct_dual_energy_substraction/itk_algo/delta
+ct_dual_energy_substraction/itk_algo/test
+
+
 # Distribution / packaging
 .Python
 build/
