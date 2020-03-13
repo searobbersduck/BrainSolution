@@ -11,11 +11,14 @@ __pycache__/
 *.nii
 *.nii.gz
 *.npy
+.vscode
 
 ct_dual_energy_substraction/itk_algo/config
 ct_dual_energy_substraction/itk_algo/delta
 ct_dual_energy_substraction/itk_algo/test
 
+liver/data
+tube_seg/data
 
 # Distribution / packaging
 .Python
