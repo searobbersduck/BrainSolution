@@ -17,8 +17,28 @@ ct_dual_energy_substraction/itk_algo/config
 ct_dual_energy_substraction/itk_algo/delta
 ct_dual_energy_substraction/itk_algo/test
 
+
+aneurysm_analysis/data
+aneurysm_analysis/train/model
+
+cerebral_parenchyma/data
+
 liver/data
 tube_seg/data
+tube_seg/task/trails
+
+*ipynb_checkpoints
+*log*.txt
+
+# gan project
+gan/external_lib/output
+gan/tmp
+*.log
+*.nii.gz
+*.mha
+*.pth
+
+gan/2d/train/checkpoints
 
 # Distribution / packaging
 .Python
