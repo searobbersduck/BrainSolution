@@ -1,3 +1,21 @@
 [submodule "external_model/lib/MedicalNet"]
 	path = external_model/lib/MedicalNet
 	url = https://github.com/searobbersduck/MedicalNet.git
+[submodule "tube_seg/external_lib/MedicalNet"]
+	path = tube_seg/external_lib/MedicalNet
+	url = https://github.com/searobbersduck/MedicalNet.git
+[submodule "tube_seg/external_lib/pytorch-3dunet"]
+	path = tube_seg/external_lib/pytorch-3dunet
+	url = https://github.com/searobbersduck/pytorch-3dunet.git
+[submodule "aneurysm_analysis/external_lib/medicaldetectiontoolkit"]
+	path = aneurysm_analysis/external_lib/medicaldetectiontoolkit
+	url = https://github.com/searobbersduck/medicaldetectiontoolkit.git
+[submodule "gan/external_lib/pytorch-CycleGAN-and-pix2pix"]
+	path = gan/external_lib/pytorch-CycleGAN-and-pix2pix
+	url = https://github.com/searobbersduck/pytorch-CycleGAN-and-pix2pix.git
+[submodule "gan/external_lib/3DGAN-Pytorch"]
+	path = gan/external_lib/3DGAN-Pytorch
+	url = https://github.com/searobbersduck/3DGAN-Pytorch.git
+[submodule "cerebral_parenchyma/external_lib/brain-segmentation-pytorch"]
+	path = cerebral_parenchyma/external_lib/brain-segmentation-pytorch
+	url = https://github.com/searobbersduck/brain-segmentation-pytorch.git

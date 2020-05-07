@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 python ../../external_lib/pytorch-CycleGAN-and-pix2pix/train.py --dataroot "/ssd2/zhangwd/data/brain/gan/2d/concat_ncct_dwi_5mm" --name facades_pix2pix --model pix2pix --dataset_mode aligned --direction AtoB --display_port 8097
