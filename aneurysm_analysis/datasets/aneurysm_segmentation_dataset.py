@@ -47,7 +47,8 @@ class AneurysmSegmentationDS(Dataset):
                 self.images_list.append(os.path.join(root_dir, '{}_image.nii.gz'.format(series_uid)))
                 self.masks_list.append(os.path.join(root_dir, '{}_mask.nii.gz'.format(series_uid)))
 
-        self.images_list = self.images_list[:2]
+        # self.images_list = self.images_list[:1]
+        # self.masks_list = self.masks_list[:1]
 
         for image_file in self.images_list:
             sitk_image = sitk.ReadImage(image_file)
@@ -114,7 +115,7 @@ class AneurysmSegmentationDS(Dataset):
 
         cropped_volume = torch.from_numpy(cropped_volume).float()
         cropped_volume = torch.unsqueeze(cropped_volume, axis=0)
-        return cropped_volume, cropped_mask, 0
+        return cropped_volume, cropped_mask
 
             
 def test_AneurysmBlockLocationDS():

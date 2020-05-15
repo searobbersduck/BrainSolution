@@ -297,5 +297,6 @@ def cta_dwi_multiprocess_main(base_dir):
 
 
 if __name__ == '__main__':
-    multiprocess_main()
+    # multiprocess_main()
     # singleprocess_main()
+    cta_dwi_multiprocess_main('/ssd2/zhangwd/data/brain/gan/hospital_6/experiment_registration2/')

@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-06 11:59:39
+@LastEditTime: 2020-05-12 11:08:38
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -21,6 +21,7 @@ import pandas as pd
 import shutil
 import csv
 import pandas as pd
+import cv2
 
 import sys
 # print(os.path.join(os.path.dirname(__file__), os.path.pardir))
@@ -41,6 +42,18 @@ from cerebral_parenchyma.train.train import inference, extract_region_by_mask, e
 import xlrd
 import datetime
 import SimpleITK as sitk
+
+
+def read_dcm_file(in_dcm_path):
+    series_reader = sitk.ImageSeriesReader()
+    dicomfilenames = series_reader.GetGDCMSeriesFileNames(in_dcm_path)
+    series_reader.SetFileNames(dicomfilenames)
+
+    series_reader.MetaDataDictionaryArrayUpdateOn()
+    series_reader.LoadPrivateTagsOn()
+
+    image = series_reader.Execute()
+    return image
 
 def ncct_extract_from_hospital_folder(in_folder, out_folder):
     '''
@@ -709,6 +722,7 @@ def ncct_extract_infos_from_xlsx(info_file):
     return patient_infos
 
 def ncct_convert_dcm_to_niigz_single(dcm_path, out_file, is_oblique=False):
+    print('processing\t{}'.format(dcm_path))
     os.makedirs(os.path.dirname(out_file), exist_ok=True)
     reader = sitk.ImageSeriesReader()
     dicomfilenames = reader.GetGDCMSeriesFileNames(dcm_path)
@@ -817,52 +831,69 @@ def ncct_convert_dcm_to_niigz(indir, outdir):
     #     ncct_convert_dcm_to_niigz_single(b0_path, out_b0_file)
     #     ncct_convert_dcm_to_niigz_single(bxxx_path, out_bxxx_file)
 
-def ncct_convert_dcm_to_niigz_onecase(indir, patient_ids, outdir):
+def ncct_convert_dcm_to_niigz_onecase(indir, patient_ids, outdir, include_adc=True):
     for patient_id in tqdm(patient_ids):
         # print(patient_id)
         index = patient_id
         patient_id = os.path.join(indir, patient_id)
         ncct_path = os.path.join(patient_id, 'NCCT')
-        adc_path = os.path.join(patient_id, 'ADC')
+        # adc_path = os.path.join(patient_id, 'ADC')
         dwi_path = os.path.join(patient_id, 'DWI')
         if not os.path.isdir(ncct_path):
             print('ncct_path:\t{}'.format(ncct_path))
             continue
-        if not os.path.isdir(adc_path):
-            print('adc_path:\t{}'.format(adc_path))
-            continue
+        # if not os.path.isdir(adc_path):
+        #     print('adc_path:\t{}'.format(adc_path))
+        #     continue
         if not os.path.isdir(dwi_path):
             print('dwi_path:\t{}'.format(dwi_path))
             continue
         ncct_path = os.path.join(ncct_path, os.listdir(ncct_path)[0])
-        adc_path = os.path.join(adc_path, os.listdir(adc_path)[0])
+        # adc_path = os.path.join(adc_path, os.listdir(adc_path)[0])
         dwi_path = os.path.join(dwi_path, os.listdir(dwi_path)[0])
         if not os.path.isdir(ncct_path):
+            print('ncct_path:\t{}'.format(ncct_path))
             continue
-        if not os.path.isdir(adc_path):
-            continue
+        # if not os.path.isdir(adc_path):
+        #     continue
         if not os.path.isdir(dwi_path):
+            print('dwi_path:\t{}'.format(dwi_path))
             continue
         out_ncct_file = os.path.join(outdir, '{}_first_BS_NCCT.nii.gz'.format(index))
         out_adc_file = os.path.join(outdir, '{}_first_FU_ADC.nii.gz'.format(index))
 
-        ncct_convert_dcm_to_niigz_single(ncct_path, out_ncct_file, True)
-        ncct_convert_dcm_to_niigz_single(adc_path, out_adc_file)
+        # ncct_convert_dcm_to_niigz_single(adc_path, out_adc_file)
 
         b0_path = os.path.join(dwi_path, 'b0')
         bxxx_path = os.path.join(dwi_path, 'bxxx')
-        if not os.path.isdir(b0_path):
+        if not os.path.isdir(b0_path) or len(os.listdir(b0_path)) == 0:
             print('b0_path:\t{}'.format(b0_path))
             continue
-        if not os.path.isdir(bxxx_path):
+        if not os.path.isdir(bxxx_path) or len(os.listdir(bxxx_path)) == 0:
             print('bxxx_path:\t{}'.format(bxxx_path))
             continue
         out_b0_file = os.path.join(outdir, '{}_first_FU_DWI_B0.nii.gz'.format(index))
         out_bxxx_file = os.path.join(outdir, '{}_first_FU_DWI_BXXX.nii.gz'.format(index))
+        # 将ncct的转换放在此处，是为了保证ncct和dwi同时存在或不存在
+        ncct_convert_dcm_to_niigz_single(ncct_path, out_ncct_file, False)
         ncct_convert_dcm_to_niigz_single(b0_path, out_b0_file)
         ncct_convert_dcm_to_niigz_single(bxxx_path, out_bxxx_file)
 
-def ncct_convert_dcm_to_niigz_multiprocess(indir, outdir, process_num=24):
+        # 有些数据不包括ADC数据，这里单独进行处理
+        if include_adc:
+            adc_path = os.path.join(patient_id, 'ADC')
+            if not os.path.isdir(adc_path):
+                print('adc_path:\t{}'.format(adc_path))
+                continue
+            adc_path = os.path.join(adc_path, os.listdir(adc_path)[0])
+            if not os.path.isdir(adc_path):
+                continue
+            ncct_convert_dcm_to_niigz_single(adc_path, out_adc_file)
+
+
+        
+
+def ncct_convert_dcm_to_niigz_multiprocess(indir, outdir, process_num=24, include_adc=True):
     '''
     indir = '../data/gan/ncct2dwi/experiment_registration2/0.raw_dcm'
     outdir = '../data/gan/ncct2dwi/experiment_registration2/1.nii_file'
@@ -886,9 +917,9 @@ def ncct_convert_dcm_to_niigz_multiprocess(indir, outdir, process_num=24):
     num_per_process = (len(patient_ids) + process_num - 1)//process_num
 
     for i in range(process_num):
-        sub_infiles = patient_ids[num_per_process*i:min(num_per_process*(i+1), len(patient_ids)-1)]
+        sub_infiles = patient_ids[num_per_process*i:min(num_per_process*(i+1), len(patient_ids))]
         print(sub_infiles)
-        result = pool.apply_async(ncct_convert_dcm_to_niigz_onecase, args=(indir, sub_infiles, outdir))
+        result = pool.apply_async(ncct_convert_dcm_to_niigz_onecase, args=(indir, sub_infiles, outdir, include_adc))
         results.append(result)
 
     pool.close()
@@ -1081,6 +1112,61 @@ def ncct_extract_dwi_from_raw_dwi_single(in_dwi_path, out_dwi_path):
         shutil.copyfile(src_file, dst_file)
     return len(in_files) == (len(not_dwi_files) + len(dwi_b0_files) + len(dwi_bxxx_files)) and len(not_dwi_files) == 0
 
+
+def cta_extract_dwi_from_raw_dwi_single(in_dwi_path, out_dwi_path):
+    '''
+    使用此函数的前提是所有的数据数据都为DWI数据，仅利用此数据来区分b0和bxxx
+    '''
+    #  os.makedirs(out_dwi_path, exist_ok=True)
+    in_files1 = glob(os.path.join(in_dwi_path, '*.dcm'))
+    in_files2 = glob(os.path.join(in_dwi_path, '*.DCM'))
+    in_files = in_files1 + in_files2
+    not_dwi_files = []
+    dwi_b0_files = []
+    dwi_bxxx_files = []
+    for in_file in in_files:
+        metadata = pydicom.dcmread(in_file)
+        # ['DERIVED', 'PRIMARY', 'DIFFUSION', 'NONE', 'TRACEW', 'ND']
+        image_type = metadata.ImageType
+        # if not('DIFFUSION' in image_type and 'TRACEW' in image_type):
+        #     not_dwi_files.append(in_file)
+        #     continue
+        try:            
+            if 'SequenceName' in metadata:
+                seq_name = metadata.SequenceName
+                if 'b0' in seq_name:
+                    dwi_b0_files.append(in_file)
+                elif 'b1000' in seq_name:
+                    dwi_bxxx_files.append(in_file)
+            elif 'DiffusionBValue' in metadata:
+                b_value = float(metadata.DiffusionBValue)
+                if b_value > 100:
+                    dwi_bxxx_files.append(in_file)
+                else:
+                    dwi_b0_files.append(in_file)
+            else:
+                not_dwi_files.append(in_file)
+        except:
+            pass
+    # assert len(in_files) == (len(not_dwi_files) + len(dwi_b0_files) + len(dwi_bxxx_files))
+    not_dwi_dir = os.path.join(out_dwi_path, 'not_dwi')
+    os.makedirs(not_dwi_dir, exist_ok=True)
+    dwi_b0_dir = os.path.join(out_dwi_path, 'b0')
+    os.makedirs(dwi_b0_dir, exist_ok=True)
+    dwi_bxxx_dir = os.path.join(out_dwi_path, 'bxxx')
+    os.makedirs(dwi_bxxx_dir, exist_ok=True)
+    for src_file in not_dwi_files:
+        dst_file = os.path.join(not_dwi_dir, os.path.basename(src_file))
+        shutil.copyfile(src_file, dst_file)
+    for src_file in dwi_b0_files:
+        dst_file = os.path.join(dwi_b0_dir, os.path.basename(src_file))
+        shutil.copyfile(src_file, dst_file)
+    for src_file in dwi_bxxx_files:
+        dst_file = os.path.join(dwi_bxxx_dir, os.path.basename(src_file))
+        shutil.copyfile(src_file, dst_file)
+    return len(in_files) == (len(not_dwi_files) + len(dwi_b0_files) + len(dwi_bxxx_files)) and len(not_dwi_files) == 0
+
+
 def ncct_extract_series_from_raw_series(in_dir, out_dir, info_file):
     '''
     indir = '../data/gan/ncct2dwi/siyuan_dcm_with_pid'
@@ -1130,6 +1216,9 @@ def ncct_extract_series_from_raw_series(in_dir, out_dir, info_file):
         ncct_extract_dwi_from_raw_dwi_single(dwi_series_path, out_dwi_series)
 
 def ncct_set_origal_point_single(infile, outfile, origal=[0,0,0]):
+    '''
+    ncct_set_origal_point_single('../data/gan/hospital_6/experiment_registration2/1.nii_file/3833955_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori/3833955_first_BS_NCCT.nii.gz')
+    '''
     image = sitk.ReadImage(infile)
     image.SetOrigin(origal)
 
@@ -1138,33 +1227,112 @@ def ncct_set_origal_point_single(infile, outfile, origal=[0,0,0]):
     writer.Execute(image)
 
 # 将nii.gz数据的起点设置到统一的位置，以便在看图软件中查看
-def ncct_set_original_point(indir, outdir, original=[0,0,0]):
-    '''
-    indir = '../data/gan/ncct2dwi/experiment_registration2/1.nii_file'
-    outdir = '../data/gan/ncct2dwi/experiment_registration2/2.nii_file_ori'
 
-    invoke cmd: python utils.py ncct_set_original_point '../data/gan/ncct2dwi/experiment_registration2/1.nii_file' '../data/gan/ncct2dwi/experiment_registration2/2.nii_file_ori'
-    debug cmd: ncct_set_original_point('../data/gan/ncct2dwi/experiment_registration2/1.nii_file', '../data/gan/ncct2dwi/experiment_registration2/2.nii_file_ori')
-    
-    '''    
-    os.makedirs(outdir, exist_ok=True)
-    infiles = glob(os.path.join(indir, '*.nii.gz'))
+def ncct_set_origal_point_singletask(infiles, outdir, original=[0,0,0]):
     for infile in tqdm(infiles):
         outfile = os.path.join(outdir, os.path.basename(infile))
         ncct_set_origal_point_single(infile, outfile, original)
 
+def ncct_set_original_point(indir, outdir, original=[0,0,0], process_num=24):
+    '''
+    indir = '../data/gan/ncct2dwi/experiment_registration2/1.nii_file'
+    outdir = '../data/gan/ncct2dwi/experiment_registration2/2.nii_file_ori'
+
+    invoke cmd: python utils.py ncct_set_original_point '../data/gan/hospital_6/experiment_registration2/1.nii_file' '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori'
+    debug cmd: ncct_set_original_point('../data/gan/hospital_6/experiment_registration2/1.nii_file', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori')
+    
+    '''    
+    os.makedirs(outdir, exist_ok=True)
+    infiles = glob(os.path.join(indir, '*.nii.gz'))
+
+
+    import multiprocessing
+    from multiprocessing import Process
+    multiprocessing.freeze_support()
+
+    pool = multiprocessing.Pool()
+    results = []
+
+    num_per_process = (len(infiles) + process_num - 1)//process_num
+
+    print(len(infiles))
+    for i in range(process_num):
+        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
+        print(len(sub_infiles))
+        result = pool.apply_async(ncct_set_origal_point_singletask, args=(sub_infiles, outdir, original))
+        results.append(result)
+
+    pool.close()
+    pool.join()
+
+
 
 # 提取脑实质
 def extract_cerebral_parenchyma_onecase(infile, outdir, inpattern='_NCCT.nii.gz', outpattern='_brain.nii.gz'):
+    '''
+    extract_cerebral_parenchyma_onecase('../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity/4495700_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/tmp')
+    '''
     if not os.path.isfile(infile):
         return
+    os.makedirs(outdir, exist_ok=True)
     sitk_mask = inference(infile, '../../cerebral_parenchyma/train/model/extract_cerebral_parenchyma/extract_cerebral_parenchyma_0056_best_loss_0.011.pth', None, is_dcm=False)
-    writer = sitk.ImageFileWriter()
-    
-    outfile = os.path.join(outdir, os.path.basename(infile).replace(inpattern, outpattern))
-    writer.SetFileName(outfile)
-    writer.Execute(sitk_mask)
+    # writer = sitk.ImageFileWriter()
+    # outfile = os.path.join(outdir, os.path.basename(infile).replace(inpattern, outpattern))
+    # writer.SetFileName(outfile)
+    # writer.Execute(sitk_mask)
 
+    ## 截取mask有脑实质的部分
+    ## 通过mask提取脑实质部分存成文件，pattern：*_brain.nii.gz
+    ## 1. 根据mask算出脑实质的有效范围，并算出z方向上的区间
+    ## 2. 根据2中计算出的区间范围，分别截取CT、脑实质mask、脑实质，存储后缀分别为_NCCT_cut.nii.gz, _brain_mask.nii.gz, _brain.nii.gz
+
+    ## step 1.
+    mask_arr = sitk.GetArrayFromImage(sitk_mask)
+    mask_z_sum = np.sum(np.sum(mask_arr, axis=-1), axis=-1)
+    ranges = np.where(mask_z_sum > 0)
+    [z_min] = np.min(np.array(ranges), axis=1)
+    [z_max] = np.max(np.array(ranges), axis=1)
+
+    ## step 2.1 截取CT
+    src_img_ct = sitk.ReadImage(infile)
+    origin = src_img_ct.GetOrigin()
+    spc = src_img_ct.GetSpacing()
+    direction = src_img_ct.GetDirection()
+    src_arr = sitk.GetArrayFromImage(src_img_ct)
+    out_arr = src_arr[z_min:z_max+1, :, :]
+    out_img = sitk.GetImageFromArray(out_arr)
+    out_img.SetOrigin(origin)
+    out_img.SetDirection(direction)
+    out_img.SetSpacing(spc)
+    # out_file = os.path.join(outdir, os.path.basename(infile).replace(inpattern, inpattern))
+    out_file = os.path.join(outdir, os.path.basename(infile).replace(inpattern, '_NCCT_crop.nii.gz'))
+    sitk.WriteImage(out_img, out_file)
+    ## step 2.2 截取mask
+    src_img = sitk_mask
+    src_arr = sitk.GetArrayFromImage(src_img)
+    out_arr = src_arr[z_min:z_max+1, :, :]
+    out_img = sitk.GetImageFromArray(out_arr)
+    out_img.SetOrigin(origin)
+    out_img.SetDirection(direction)
+    out_img.SetSpacing(spc)
+    out_file = os.path.join(outdir, os.path.basename(infile).replace(inpattern, '_brain_mask.nii.gz'))
+    sitk.WriteImage(out_img, out_file)
+    ## step 2.3 截取脑实质
+    maskfilter = sitk.MaskImageFilter()
+    maskfilter.SetOutsideValue(-1024)
+    mask_img = sitk.Cast(sitk_mask, sitk.sitkInt16)
+    src_img_brain = sitk.Cast(src_img_ct, sitk.sitkInt16)
+    out_img = maskfilter.Execute(src_img_brain, mask_img)
+    src_img = out_img
+    src_arr = sitk.GetArrayFromImage(src_img)
+    out_arr = src_arr[z_min:z_max+1, :, :]
+    out_img = sitk.GetImageFromArray(out_arr)
+    out_img.SetOrigin(origin)
+    out_img.SetDirection(direction)
+    out_img.SetSpacing(spc)
+    out_file = os.path.join(outdir, os.path.basename(infile).replace(inpattern, outpattern))
+    sitk.WriteImage(out_img, out_file)
+    
 
 
 
@@ -1172,9 +1340,29 @@ def extract_cerebral_parenchyma_singletask(infiles, outdir, inpattern='_NCCT.nii
     for infile in tqdm(infiles):
         extract_cerebral_parenchyma_onecase(infile, outdir, inpattern, outpattern)
 
-def extract_cerebral_parenchyma_multiprocess(indir, outdir, inpattern='_NCCT.nii.gz', outpattern='_brain.nii.gz'):
+def extract_cerebral_parenchyma_multiprocess(indir, outdir, inpattern='_NCCT.nii.gz', outpattern='_brain.nii.gz', process_num=6):
+    
     infiles = glob(os.path.join(indir, '*{}'.format(inpattern)))
-    extract_cerebral_parenchyma_singletask(infiles, outdir, inpattern, outpattern)
+
+    import multiprocessing
+    from multiprocessing import Process
+    multiprocessing.freeze_support()
+
+    pool = multiprocessing.Pool()
+    results = []
+
+    num_per_process = (len(infiles) + process_num - 1)//process_num
+
+    for i in range(process_num):
+        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
+        print(sub_infiles)
+        result = pool.apply_async(extract_cerebral_parenchyma_singletask, args=(sub_infiles, outdir, inpattern, outpattern))
+        results.append(result)
+
+    pool.close()
+    pool.join()
+
+    # extract_cerebral_parenchyma_singletask(infiles, outdir, inpattern, outpattern)
 
 
 
@@ -1267,12 +1455,86 @@ def ncct_generate_cerebral_parenchyma_multiprocess(indir, outdir, inpattern, pro
     num_per_process = (len(infiles) + process_num - 1)//process_num
 
     for i in range(process_num):
-        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles)-1)]
+        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
         result = pool.apply_async(ncct_generate_cerebral_parenchyma_single, args=(sub_infiles, outdir))
         results.append(result)
 
     pool.close()
     pool.join()
+
+
+
+# 找出脑实质的最大层，并在最大层的上下各取60层（假设层厚为0.5mm）
+def ncct_generate_cerebral_parenchyma_middle_layer_onecase(infile, outfile):
+    '''
+    ncct_generate_cerebral_parenchyma_middle_layer_onecase('../data/gan/hospital_4/experiment_registration2/5 dwi_rigid_align_ncct/406862_first_BS_brain.nii.gz', None)
+    '''
+    in_img = sitk.ReadImage(infile)
+    in_arr = sitk.GetArrayFromImage(in_img)
+    out_arr = np.zeros(in_arr.shape, dtype=in_arr.dtype)
+    # 范围限定在(5, in_arr.shape[0]-5)，因为配准时脑实质图像的上下边缘生成有问题
+    for z in range(5, in_arr.shape[0]-5):
+        for y in range(in_arr.shape[1]):
+            x_arr = in_arr[z,y,:]
+            # low_thres = 0
+            low_thres = -1024
+            ranges = np.where(x_arr != low_thres)
+            if len(ranges[0]) > 0:
+                [x_min] = np.min(ranges, axis=1)
+                [x_max] = np.max(ranges, axis=1)
+                out_arr[z,y,x_min:x_max+1] = 1
+    
+    # 在保留的断层中，mask区域扩大到和最大层面面积相等
+    max_region = np.max(out_arr, axis=0)
+    layers = np.sum(out_arr, axis=(1,2))
+    max_layer_index = np.argmax(layers)
+
+    layer_delta = 64
+    valid_range = list(range(max(0, max_layer_index-layer_delta), max_layer_index+layer_delta))
+
+    for z in range(in_arr.shape[0]):
+        if (z not in valid_range) or (layers[z]/max(layers) < 0.5):
+            out_arr[z,:,:] = 0
+        else:
+            out_arr[z,:,:] = 1
+
+    out_img = sitk.GetImageFromArray(out_arr)
+    out_img.CopyInformation(in_img)
+    out_file = outfile
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    writer = sitk.ImageFileWriter()
+    writer.SetFileName(out_file)
+    writer.Execute(out_img)
+
+
+def ncct_generate_cerebral_parenchyma_middle_layer_single(infiles, outdir):
+    os.makedirs(outdir, exist_ok=True)
+    for infile in tqdm(infiles):
+        outfile = os.path.join(outdir, os.path.basename(infile))
+        ncct_generate_cerebral_parenchyma_middle_layer_onecase(infile, outfile)
+
+
+def ncct_generate_cerebral_parenchyma_middle_layer_multiprocess(indir, outdir, inpattern, process_num=12):
+    
+    import multiprocessing
+    from multiprocessing import Process
+    multiprocessing.freeze_support()
+
+    pool = multiprocessing.Pool()
+    results = []
+    
+    os.makedirs(outdir, exist_ok=True)
+    infiles = glob(os.path.join(indir, inpattern))
+    
+    num_per_process = (len(infiles) + process_num - 1)//process_num
+
+    for i in range(process_num):
+        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
+        result = pool.apply_async(ncct_generate_cerebral_parenchyma_middle_layer_single, args=(sub_infiles, outdir))
+        results.append(result)
+
+    pool.close()
+    pool.join()        
 
 
 def utils_get_folder_pattern(indir, initpattern):
@@ -1650,6 +1912,369 @@ def cta_generate(indir):
     df = pd.DataFrame(np.array(row_elems), columns=['patient_id', 'cta_id', 'cta_acq_time', 'dwi_id', 'dwi_acq_time', 'adc_id', 'adc_acq_time', 'dwi_cta_time', 'adc_cta_time_str'])
     df.to_csv('cta_dwi_adc_test.csv')
 
+def cta_extract_infos_from_xlsx(info_file):
+    '''
+    info_file = '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx'
+    invoke cmd: python utils.py cta_extract_infos_from_xlsx '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx'
+    debug cmd: cta_extract_infos_from_xlsx('../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
+    
+    file head: 
+    ['批次(1/2/3)', '影像号', 
+    '1:入组 或 2:排除', 
+    'CTA Series Instance UID', 'DWI Series Instance UID', 
+    'CTA时间(DICOM tag)', 'DWI扫描时间(DICOM tag)', 
+    'CTA与DWI时间间隔(DICOM tag)', 
+    '性别', '年龄', '体重', '入院NIHSS', '出院NIHSS', '入院收缩压', '入院舒张压', '糖尿病', '高血压', 
+    '房颤', '卒中史', '吸烟状态', '发病时间', 'DWI复查时间', '病变血管', '梗死区域', '治疗方式', '治疗时间', 
+    'NCCT Series Instance UID', 'NCCT时间(DICOM tag)', 'DWI与NCCT时间间隔(DICOM tag)']
+    '''
+    
+    wb = xlrd.open_workbook(info_file)
+    sheet_names = wb.sheet_names()
+
+    ws = wb.sheet_by_index(0)
+    print(ws.row_values(0))
+
+    pid_index = ws.row_values(0).index('影像号')
+    valid_index = ws.row_values(0).index('1:入组 或 2:排除')
+    cta_index = ws.row_values(0).index('CTA Series Instance UID')
+    dwi_index = ws.row_values(0).index('DWI Series Instance UID')
+    cta_dwi_delta_time_index = ws.row_values(0).index('CTA与DWI时间间隔(DICOM tag)')
+
+    patient_infos = {}
+    for i_r in range(1,ws.nrows):
+        pid = str(int(ws.row_values(i_r)[pid_index]))
+        if len(pid) == 0 or pid is None:
+            continue
+        valid_flag = str(int(ws.row_values(i_r)[valid_index]))
+        if valid_flag != '1':
+            continue
+        patient_info = {}
+        cta_uid = ws.row_values(i_r)[cta_index]
+        dwi_uid = ws.row_values(i_r)[dwi_index]
+        cta_dwi_delta_time = ws.row_values(i_r)[cta_dwi_delta_time_index]
+        patient_info['pid'] = pid
+        patient_info['cta_uid'] = cta_uid
+        patient_info['dwi_uid'] = dwi_uid
+        patient_info['cta_dwi_delta_time'] = cta_dwi_delta_time
+        patient_infos[pid] = patient_info
+    return patient_infos
+
+
+def cta_extract_series_to_patient(indir, out_dir, info_file):
+    '''
+    debug: cta_extract_series_to_patient('../data/gan/hospital_6/ori', '../data/gan/hospital_6/0.raw_dcm', '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
+    invoke: python gan_utils.py cta_extract_series_to_patient '../data/gan/hospital_6/ori', '../data/gan/hospital_6/0.raw_dcm', '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx'
+    
+    indir:
+    tree -L 1
+    .
+    ├── 1.2.156.112605.189250946103856.190725032121.3.5972.26584
+    ├── 1.2.156.112605.189250946103856.190804032608.3.6024.213494
+    ├── 1.2.156.112605.189250946103856.190903010933.3.6016.113322
+    ├── 1.2.156.112605.189250946103856.191104010418.3.6364.115889
+    ├── 1.2.156.112605.189250946103856.191104141450.3.6364.118948
+
+    out_dir:
+    tree -L 4
+    └── 5023941
+        ├── DWI
+        │   └── 1.3.12.2.1107.5.2.36.40534.2020040916392479035839142.0.0.0
+        │       ├── b0
+        │       ├── bxxx
+        │       └── not_dwi
+        └── NCCT
+            └── 1.2.156.112605.189250946103856.200406031912.3.5724.111797
+                ├── 000001.dcm
+                ├── 000002.dcm
+                ├── 000003.dcm
+                ├── 000004.dcm
+
+    info_file:
+    file head: 
+    ['批次(1/2/3)', '影像号', 
+    '1:入组 或 2:排除', 
+    'CTA Series Instance UID', 'DWI Series Instance UID', 
+    'CTA时间(DICOM tag)', 'DWI扫描时间(DICOM tag)', 
+    'CTA与DWI时间间隔(DICOM tag)', 
+    '性别', '年龄', '体重', '入院NIHSS', '出院NIHSS', '入院收缩压', '入院舒张压', '糖尿病', '高血压', 
+    '房颤', '卒中史', '吸烟状态', '发病时间', 'DWI复查时间', '病变血管', '梗死区域', '治疗方式', '治疗时间', 
+    'NCCT Series Instance UID', 'NCCT时间(DICOM tag)', 'DWI与NCCT时间间隔(DICOM tag)']
+
+    '''
+    patient_infos = cta_extract_infos_from_xlsx(info_file)
+    for key, patient_info in patient_infos.items():
+        cta_uid = patient_info['cta_uid']
+        dwi_uid = patient_info['dwi_uid']
+        cta_path = os.path.join(indir, cta_uid)
+        dwi_path = os.path.join(indir, dwi_uid)
+        if not os.path.isdir(cta_path):
+            continue
+        if not os.path.isdir(dwi_path):
+            continue
+        out_ncct_series = os.path.join(out_dir, key, 'NCCT', cta_uid)
+        shutil.copytree(cta_path, out_ncct_series)
+
+        out_dwi_series = os.path.join(out_dir, key, 'DWI', dwi_uid)
+        cta_extract_dwi_from_raw_dwi_single(dwi_path, out_dwi_series)
+
+
+class SeriesInfo:
+    # def __init__(self, origin, direction, spacing):
+    #     self.origin = origin
+    #     self.direction = direction
+    #     self.spacing = spacing
+    def __init__(self):
+        super().__init__()
+
+    def getInfoFromImage(self, image):
+        self.origin = image.GetOrigin()
+        self.direction = image.GetDirection()
+        self.spacing = image.GetSpacing()
+
+    def getInfoFromImageFile(self, image_file, is_dcm=False):
+        if is_dcm:
+            image = read_dcm_file(image_file)
+        else:
+            image = sitk.ReadImage(image_file)
+        self.getInfoFromImage(image)
+
+
+
+## rapid 相关操作
+def rapid_extract_summary_info_dcm0_core_infarct_area(dcm_file, adc_info, patient_id, out_dir):
+    '''
+    核心梗死区
+    '''
+    os.makedirs(out_dir, exist_ok=True)
+    image = sitk.ReadImage(dcm_file)
+    arr = sitk.GetArrayFromImage(image)
+    
+    dwi_arr = np.zeros([20, 256, 256, 3], dtype=np.uint8)
+
+    mask_arr = np.zeros([20, 256, 256], dtype=np.uint8)
+    # 图像从中间分开, 一行20例数据，其中五例dwi, 五例mrp
+    # 四行，一共20例数据, 每例数据的size:256x256
+    single_h = 256
+    single_w = 256
+
+    [img_h, img_w] = arr.shape[1:3]
+
+    assert img_w/single_w == img_w//single_w
+    for ih in range(4):
+        for iw in range(5):
+            iz = ih*5+iw
+            dwi_arr[iz,:,:, :] = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w:(iw+1)*single_w, :]
+            # dwi_arr[iz,:,:, :] = arr[0, 256:512, 256:512, :]
+    dwi_img = sitk.GetImageFromArray(dwi_arr)
+    dwi_img.SetOrigin(adc_info.origin)
+    dwi_img.SetDirection(adc_info.direction)
+    dwi_img.SetSpacing(adc_info.spacing)
+    out_dwi_file = os.path.join(out_dir, '{}_first_FU_DWI_INFARCT.nii.gz'.format(patient_id))
+    sitk.WriteImage(dwi_img, out_dwi_file)
+    infarct_mask_arr = dwi_arr[:,:,:,0] - dwi_arr[:,:,:,1]
+    infarct_mask_arr[infarct_mask_arr != 255] = 0
+    infarct_mask_arr[infarct_mask_arr == 255] = 1
+    infarct_mask_img = sitk.GetImageFromArray(infarct_mask_arr)
+    infarct_mask_img.SetOrigin(adc_info.origin)
+    infarct_mask_img.SetDirection(adc_info.direction)
+    infarct_mask_img.SetSpacing(adc_info.spacing)
+    infarct_mask_file = os.path.join(out_dir, '{}_first_FU_DWI_INFARCT_MASK.nii.gz'.format(patient_id))
+    sitk.WriteImage(infarct_mask_img, infarct_mask_file)
+
+    #检查是否存在核心梗死区
+    infarct_area = np.sum(infarct_mask_arr)
+    if infarct_area > 5:
+        print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
+        return True
+    else:
+        return False
+
+#    dwi_img = sitk.GetImageFromArray(dwi_arr)
+#    sitk.WriteImage(dwi_img, 'test.nii.gz')
+
+
+def rapid_extract_summary_info_dcm0_ischemic_penumbra(dcm_file, adc_info, patient_id, out_dir):
+    '''
+    缺血半暗带
+    '''
+    os.makedirs(out_dir, exist_ok=True)
+    image = sitk.ReadImage(dcm_file)
+    arr = sitk.GetArrayFromImage(image)
+    
+    dwi_arr = np.zeros([20, 256, 256, 3], dtype=np.uint8)
+
+    mask_arr = np.zeros([20, 256, 256], dtype=np.uint8)
+    # 图像从中间分开, 一行20例数据，其中五例dwi, 五例mrp
+    # 四行，一共20例数据, 每例数据的size:256x256
+    single_h = 256
+    single_w = 256
+
+    [img_h, img_w] = arr.shape[1:3]
+
+    assert img_w/single_w == img_w//single_w
+    bias_w = 256*5
+    for ih in range(4):
+        for iw in range(5):
+            iz = ih*5+iw
+            dwi_arr[iz,:,:, :] = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w+bias_w:(iw+1)*single_w+bias_w, :]
+            # dwi_arr[iz,:,:, :] = arr[0, 256:512, 256:512, :]
+    dwi_img = sitk.GetImageFromArray(dwi_arr)
+    dwi_img.SetOrigin(adc_info.origin)
+    dwi_img.SetDirection(adc_info.direction)
+    dwi_img.SetSpacing(adc_info.spacing)
+    out_dwi_file = os.path.join(out_dir, '{}_first_FU_ISCHEMIC_PENUMBRA.nii.gz'.format(patient_id))
+    sitk.WriteImage(dwi_img, out_dwi_file)
+    infarct_mask_arr = dwi_arr[:,:,:,1] - dwi_arr[:,:,:,0]
+    infarct_mask_arr[infarct_mask_arr != 255] = 0
+    infarct_mask_arr[infarct_mask_arr == 255] = 1
+    infarct_mask_img = sitk.GetImageFromArray(infarct_mask_arr)
+    infarct_mask_img.SetOrigin(adc_info.origin)
+    infarct_mask_img.SetDirection(adc_info.direction)
+    infarct_mask_img.SetSpacing(adc_info.spacing)
+    infarct_mask_file = os.path.join(out_dir, '{}_first_FU_ISCHEMIC_PENUMBRA_MASK.nii.gz'.format(patient_id))
+    sitk.WriteImage(infarct_mask_img, infarct_mask_file)
+
+    #检查是否存在核心梗死区
+    infarct_area = np.sum(infarct_mask_arr)
+    if infarct_area > 5:
+        print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
+        return True
+    else:
+        return False
+    
+
+def rapid_extract_sumary_info(rapid_series_path, adc_info, patient_id, outdir):
+    '''
+    rapid_series_path: '../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316'
+    debug: rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316')
+    '''
+    rapid_files1 = glob(os.path.join(rapid_series_path, '*.DCM'))
+    rapid_files2 = glob(os.path.join(rapid_series_path, '*.dcm'))
+
+    rapid_files = rapid_files1 + rapid_files2
+    rapid_files.sort()
+
+    rapid_file = rapid_files[0]
+    rapid_extract_summary_info_dcm0_core_infarct_area(rapid_files[0], adc_info, patient_id, outdir)
+    rapid_extract_summary_info_dcm0_ischemic_penumbra(rapid_files[0], adc_info, patient_id, outdir)
+
+    print('hello world!')
+
+def rapid_extract_sumary_info_multiprocess(indir, outdir):
+    '''
+    rapid_extract_sumary_info_multiprocess('../data/gan/hospital_4/0.raw_dcm', '../data/gan/hospital_4/1.rapid')
+    '''
+    cnt = 0
+    for patient_id in os.listdir(indir):
+        patient_path = os.path.join(indir, patient_id)
+        if not os.path.isdir(patient_path):
+            continue
+        rapid_path = os.path.join(os.path.join(patient_path, 'RAPID'))
+        adc_path = os.path.join(os.path.join(patient_path, 'ADC'))
+        if not os.path.isdir(rapid_path):
+            continue
+        if not os.path.isdir(adc_path):
+            continue
+        series_uids = os.listdir(rapid_path)
+        adc_uids = os.listdir(adc_path)
+        if len(series_uids) != 1:
+            continue
+        if len(adc_uids) != 1:
+            continue
+        series_uid = series_uids[0]
+        series_path = os.path.join(rapid_path, series_uid)
+        adc_uid = adc_uids[0]
+        adc_path = os.path.join(adc_path, adc_uid)
+        if not os.path.isdir(series_path):
+            continue
+        if not os.path.isdir(adc_path):
+            continue
+        adc_info = SeriesInfo()
+        adc_info.getInfoFromImageFile(adc_path, is_dcm=True)
+        rapid_extract_sumary_info(series_path, adc_info, patient_id, outdir)
+        cnt += 1
+        # break
+    print('rapid count is:\t{}'.format(cnt))
+    
+
+# 批量修改文件名字
+def change_names_batch(indir, outdir, inpattern, outpattern):
+    '''
+    debug cmd: change_names_batch('../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity', '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity', '_NCCT.nii.gz', '_NCCT_bk.nii.gz')
+    invoke: python gan_utils.py change_names_batch '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '_NCCT.nii.gz' '_NCCT_bk.nii.gz'
+    '''
+    os.makedirs(outdir, exist_ok=True)
+    infiles = glob(os.path.join(indir, '*{}'.format(inpattern)))
+    for infile in infiles:
+        outfile = os.path.join(outdir, os.path.basename(infile).replace(inpattern, outpattern))
+        os.rename(infile, outfile)
+
+
+# 批量将三维数据的3个截面保存
+def extract_mpr_one_case(infile, outdir, is_dcm=False):
+    '''
+    数据数据为做过resample（三个维度上spacing一致）的nii.gz格式
+    debug cmd: extract_mpr('../data/gan/hospital_6/experiment_registration2/8.2.out/NCCT/1014186_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/8.2.out/projection')
+    debug cmd: extract_mpr('../data/gan/hospital_6/experiment_registration2/8.2.out/DWI_BXXX/1014186_first_FU_DWI_BXXX.nii.gz', '../data/gan/hospital_6/experiment_registration2/8.2.out/projection')
+    '''
+    os.makedirs(outdir, exist_ok=True)
+    image = sitk.ReadImage(infile)
+    arr = sitk.GetArrayFromImage(image)
+    [z,y,x] = arr.shape
+    z_plane = arr[z//2, :, :]
+    y_plane = arr[:, y//2, :]
+    x_plane = arr[:,:,x//2]
+    
+    z_name = os.path.basename(infile).split('.')[0]+'_z.jpg'
+    z_name = os.path.join(outdir, z_name)
+    y_name = os.path.basename(infile).split('.')[0]+'_y.jpg'
+    y_name = os.path.join(outdir, y_name)
+    x_name = os.path.basename(infile).split('.')[0]+'_x.jpg'
+    x_name = os.path.join(outdir, x_name)
+    cv2.imwrite(z_name, z_plane)
+    cv2.imwrite(y_name, y_plane)
+    cv2.imwrite(x_name, x_plane)
+
+def extract_mpr_singletask(infiles, outdir):
+    for infile in tqdm(infiles):
+        extract_mpr_one_case(infile, outdir)
+
+
+def extract_mpr_multiprocess(indir, outdir, process_num=12):
+    '''
+    python gan_utils.py extract_mpr_multiprocess '../data/gan/hospital_6/experiment_registration2/8.2.out/NCCT' '../data/gan/hospital_6/experiment_registration2/8.2.out/projection'
+    python gan_utils.py extract_mpr_multiprocess '../data/gan/hospital_6/experiment_registration2/8.2.out/DWI_BXXX' '../data/gan/hospital_6/experiment_registration2/8.2.out/projection'
+    '''
+
+    infiles = glob(os.path.join(indir, '*.nii.gz'))
+
+    import multiprocessing
+    from multiprocessing import Process
+    multiprocessing.freeze_support()
+
+    pool = multiprocessing.Pool()
+    results = []
+
+    num_per_process = (len(infiles) + process_num - 1)//process_num
+
+    for i in range(process_num):
+        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
+        print(sub_infiles)
+        result = pool.apply_async(extract_mpr_singletask, args=(sub_infiles, outdir))
+        results.append(result)
+
+    pool.close()
+    pool.join()
+
+
+def test_fire(t_int, t_bool, t_str):
+    print(t_int+1)
+    print(t_bool)
+    if t_bool is True:
+        print('1')
+    print(True)
+
 
 if __name__ =='__main__':
     fire.Fire()
@@ -1675,3 +2300,10 @@ if __name__ =='__main__':
     # extract_cerebral_parenchyma_multiprocess('../data/gan/ncct2dwi/experiment_registration2/4 Patient_nii_unity', '../data/gan/ncct2dwi/experiment_registration2/4 Patient_nii_unity', '_NCCT.nii.gz', '_brain.nii.gz')
     # extract_cerebral_parenchyma_multiprocess('../data/gan/hospital_4/experiment_registration2/4 Patient_nii_unity', '../data/gan/hospital_4/experiment_registration2/4 Patient_nii_unity', '_NCCT.nii.gz', '_brain.nii.gz')
     # ncct_generate_table_all_series('../data/gan/hospital_4/0.ori', '../data/gan/hospital_4/0.table')
+    # ncct_generate_cerebral_parenchyma_middle_layer_onecase('../data/gan/hospital_4/experiment_registration2/5 dwi_rigid_align_ncct/406862_first_BS_brain.nii.gz', None)
+    # cta_extract_infos_from_xlsx('../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
+    # cta_extract_series_to_patient('../data/gan/hospital_6/ori', '../data/gan/hospital_6/0.raw_dcm', '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
+    # rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316')
+    # test_rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm', '../data/gan/hospital_4/1.rapid')
+    # extract_cerebral_parenchyma_onecase('../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity/4495700_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/tmp')
+    # ncct_set_origal_point_single('../data/gan/hospital_6/experiment_registration2/1.nii_file/3833955_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori/3833955_first_BS_NCCT.nii.gz')

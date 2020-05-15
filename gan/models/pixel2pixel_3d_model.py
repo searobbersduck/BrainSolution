@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-03-30 15:44:31
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-04-21 21:01:40
+@LastEditTime: 2020-05-15 09:20:27
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -98,6 +98,67 @@ class PixelDiscriminator(nn.Module):
         """Standard forward."""
         return self.net(input)
 
+# class ResnetGenerator(nn.Module):
+#     """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations.
+
+#     We adapt Torch code and idea from Justin Johnson's neural style transfer project(https://github.com/jcjohnson/fast-neural-style)
+#     """
+
+#     def __init__(self, input_nc, output_nc, ngf=64, norm_layer=nn.BatchNorm3d, use_dropout=False, n_blocks=6, padding_type='zero'):
+#         """Construct a Resnet-based generator
+
+#         Parameters:
+#             input_nc (int)      -- the number of channels in input images
+#             output_nc (int)     -- the number of channels in output images
+#             ngf (int)           -- the number of filters in the last conv layer
+#             norm_layer          -- normalization layer
+#             use_dropout (bool)  -- if use dropout layers
+#             n_blocks (int)      -- the number of ResNet blocks
+#             padding_type (str)  -- the name of padding layer in conv layers: reflect | replicate | zero
+#         """
+#         assert(n_blocks >= 0)
+#         super(ResnetGenerator, self).__init__()
+#         if type(norm_layer) == functools.partial:
+#             use_bias = norm_layer.func == nn.InstanceNorm3d
+#         else:
+#             use_bias = norm_layer == nn.InstanceNorm3d
+
+#         model = [nn.Conv3d(input_nc, ngf, kernel_size=7, padding=3, bias=use_bias),
+#                  norm_layer(ngf),
+#                  nn.ReLU(True)]
+
+#         n_downsampling = 3
+#         for i in range(n_downsampling):  # add downsampling layers
+#             mult = 2 ** i
+#             model += [nn.Conv3d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+#                       norm_layer(ngf * mult * 2),
+#                       nn.ReLU(True)]
+
+#         mult = 2 ** n_downsampling
+#         for i in range(n_blocks):       # add ResNet blocks
+
+#             model += [ResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+
+#         for i in range(n_downsampling):  # add upsampling layers
+#             mult = 2 ** (n_downsampling - i)
+#             model += [nn.ConvTranspose3d(ngf * mult, int(ngf * mult / 2),
+#                                          kernel_size=3, stride=2,
+#                                          padding=1, output_padding=1,
+#                                          bias=use_bias),
+#                       norm_layer(int(ngf * mult / 2)),
+#                       nn.ReLU(True)]
+
+#         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=3)]
+#         # model += [nn.Tanh()]
+
+#         self.model = nn.Sequential(*model)
+
+#     def forward(self, input):
+#         """Standard forward"""
+#         return self.model(input)
+
+
+
 class ResnetGenerator(nn.Module):
     """Resnet-based generator that consists of Resnet blocks between a few downsampling/upsampling operations.
 
@@ -141,12 +202,17 @@ class ResnetGenerator(nn.Module):
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            model += [nn.ConvTranspose3d(ngf * mult, int(ngf * mult / 2),
-                                         kernel_size=3, stride=2,
-                                         padding=1, output_padding=1,
-                                         bias=use_bias),
-                      norm_layer(int(ngf * mult / 2)),
-                      nn.ReLU(True)]
+            # model += [nn.ConvTranspose3d(ngf * mult, int(ngf * mult / 2),
+            #                              kernel_size=3, stride=2,
+            #                              padding=1, output_padding=1,
+            #                              bias=use_bias),
+            #           norm_layer(int(ngf * mult / 2)),
+            #           nn.ReLU(True)]
+            model += [nn.Upsample(scale_factor=2, mode='trilinear'), 
+                nn.Conv3d(ngf * mult, int(ngf * mult / 2), kernel_size=3, stride=1, padding=1, bias=use_bias), 
+                norm_layer(int(ngf * mult / 2)),nn.ReLU(True)]
+
+            
 
         model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=3)]
         # model += [nn.Tanh()]
@@ -156,6 +222,8 @@ class ResnetGenerator(nn.Module):
     def forward(self, input):
         """Standard forward"""
         return self.model(input)
+
+
 
 
 class Pix2PixModel():

@@ -12,6 +12,7 @@ __pycache__/
 *.nii.gz
 *.npy
 .vscode
+*.onnx
 
 ct_dual_energy_substraction/itk_algo/config
 ct_dual_energy_substraction/itk_algo/delta
@@ -20,6 +21,7 @@ ct_dual_energy_substraction/itk_algo/test
 
 aneurysm_analysis/data
 aneurysm_analysis/train/model
+aneurysm_analysis/train/trails
 
 cerebral_parenchyma/data
 

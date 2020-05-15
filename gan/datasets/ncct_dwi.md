@@ -53,7 +53,10 @@
     * 此处的mask，所有有效层面(***当前层面和最大层面的比值>0.5***)统一到和最大层面的mask相同；
 
 - [ ] 5.1 计算CT和DWI图像的边界， 在做配准和重采样运算时，会因为图像旋转等，产生没有值的区域，这部分区域一般会被设置为默认值，在实际进行生成模型的训练时，该区域不能加入运算，因此需要事先计算出这部分区域
-    * 
+
+
+- [ ] 5.2 取中间层的上下64层数据
+    * 调用命令：`python gan_utils.py ncct_generate_cerebral_parenchyma_middle_layer_multiprocess '../data/gan/ncct2dwi/experiment_registration2/5 dwi_rigid_align_ncct' '../data/gan/ncct2dwi/experiment_registration2/8.1.out/cerebral_parenchyma' *_brain.nii.gz 12`
 
 - [x] 6. 根据脑实质的mask，将相应的CTA和DWI部分截取出来
     * 提取NCCT，调用命令：`python cta_to_dwi_dataset.py extract_region_by_mask '../data/gan/ncct2dwi/experiment_registration2/8.out/cerebral_parenchyma' '../data/gan/ncct2dwi/experiment_registration2/5 dwi_rigid_align_ncct' '../data/gan/ncct2dwi/experiment_registration2/8.out/NCCT' *brain*.nii.gz *NCCT.nii.gz`
