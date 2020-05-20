@@ -54,7 +54,8 @@ class Options():
         # self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200506/pixel2pixel_netG_epoch_50_loss_69.7196.pth'
         # self.netG_model_path = '../../data/gan/hospital_4/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_nonmask_20200508/pixel2pixel_netG_epoch_175_loss_11.4341.pth'
         # self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200508/pixel2pixel_netG_epoch_400_loss_16.9547.pth' #ncct还可以
-        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_300_loss_7.5488.pth'
+        # self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_300_loss_7.5488.pth'
+        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_950_loss_9.0383.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
         # self.netG_model_path = None
         self.netD_model_path = None
@@ -138,7 +139,9 @@ def batch_predict_cta(root_dir, config_file, outdir):
         gt_dwi_file = gt_dwi_list[i]
         predict(ct_file, outdir)
         dst_gt_dwi_file = os.path.join(outdir, os.path.basename(gt_dwi_file))
+        dst_ct_file = os.path.join(outdir, os.path.basename(ct_file))
         shutil.copyfile(gt_dwi_file, dst_gt_dwi_file)
+        shutil.copyfile(ct_file, dst_ct_file)
 
 
 def batch_convert_niigz_jpg(indir, outdir):
@@ -149,22 +152,26 @@ def batch_convert_niigz_jpg(indir, outdir):
     fake_list = glob(os.path.join(indir, '*{}*'.format(fake_pattern)))
     patient_ids = [os.path.basename(i).split('_')[0] for i in fake_list]
     for patient_id in tqdm(patient_ids):
-        # ct_file = os.path.join(indir, '{}{}'.format(patient_id, ct_pattern))
+        ct_file = os.path.join(indir, '{}{}'.format(patient_id, ct_pattern))
         fake_file = os.path.join(indir, '{}{}'.format(patient_id, fake_pattern))
         real_file = os.path.join(indir, '{}{}'.format(patient_id, real_pattern))
         sub_outdir = os.path.join(outdir, patient_id)
         os.makedirs(sub_outdir, exist_ok=True)
         fake_img = sitk.ReadImage(fake_file)
         real_img = sitk.ReadImage(real_file)
+        ct_img = sitk.ReadImage(ct_file)
         fake_arr = sitk.GetArrayFromImage(fake_img)
         real_arr = sitk.GetArrayFromImage(real_img)
+        ct_arr = sitk.GetArrayFromImage(ct_img)
         z_len = real_arr.shape[0]
         for j in range(z_len):
-            sub_fake_file = os.path.join(sub_outdir, '{}_fake.jpg'.format(j))
-            sub_real_file = os.path.join(sub_outdir, '{}_real.jpg'.format(j))
+            sub_fake_file = os.path.join(sub_outdir, '{}_{}_fake.jpg'.format(patient_id, j))
+            sub_real_file = os.path.join(sub_outdir, '{}_{}_real.jpg'.format(patient_id, j))
+            sub_ct_file = os.path.join(sub_outdir, '{}_{}_ct.jpg'.format(patient_id, j))
 
             cv2.imwrite(sub_fake_file, fake_arr[j])
             cv2.imwrite(sub_real_file, real_arr[j])
+            cv2.imwrite(sub_ct_file, ct_arr[j])
 
 
 
@@ -175,5 +182,5 @@ if __name__ == '__main__':
     # predict('../../data/gan/hospital_4_2/experiment_registration2/8.out/NCCT/441128_first_BS_NCCT.nii.gz', '../../data/gan/hospital_4/experiment_registration2/10.predict')
     # predict('../../data/gan/hospital_4/experiment_registration2/8.2.out/NCCT/439856_first_BS_NCCT.nii.gz', '../../data/gan/hospital_4/experiment_registration2/10.predict')
     # predict('../../data/gan/hospital_6/experiment_registration2/8.2.out/NCCT/4692992_first_BS_NCCT.nii.gz', '../../data/gan/hospital_6/experiment_registration2/10.predict')
-    # batch_predict_cta('../../data/gan/hospital_6/experiment_registration2/8.2.out', '../../data/gan/hospital_6/experiment_registration2/8.2.out/config/ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_6/experiment_registration2/10.predict')
+    batch_predict_cta('../../data/gan/hospital_6/experiment_registration2/8.2.out', '../../data/gan/hospital_6/experiment_registration2/8.2.out/config/ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_6/experiment_registration2/10.predict')
     batch_convert_niigz_jpg('../../data/gan/hospital_6/experiment_registration2/10.predict', '../../data/gan/hospital_6/experiment_registration2/10.predict_jpg')

@@ -246,6 +246,41 @@ class NCCT_GAN_MASK_DS(Dataset):
         # print('__center_crop_data\tZ_min:{}\tY_min:{}\tX_min:{}'.format(Z_min, Y_min, X_min))
         return ct_data[Z_min: Z_max, Y_min: Y_max, X_min: X_max], dwi_data[Z_min: Z_max, Y_min: Y_max, X_min: X_max], mask_data[Z_min: Z_max, Y_min: Y_max, X_min: X_max]
 
+    def __random_skip_thickness_crop_data(self, ct_data, dwi_data, mask_data, size, cropped_boundary):
+        '''
+        random select z layers from d-direction
+        '''
+        padding = 1
+        [img_d, img_h, img_w] = [cropped_boundary.boundary_d_max+padding, cropped_boundary.boundary_h_max+padding, cropped_boundary.boundary_w_max+padding]
+        [input_d, input_h, input_w] = size
+        # assert np.all(np.less_equal(size, dwi_data.shape))
+        z_min_upper = img_d - input_d
+        y_min_upper = img_h - input_h
+        x_min_upper = img_w - input_w
+
+        # print('cropped_boundary.boundary_d_min-padding:\t', cropped_boundary.boundary_d_min-padding)
+        # print('z_min_upper\t', z_min_upper)
+        # print('cropped_boundary.boundary_h_min-padding\t', cropped_boundary.boundary_h_min-padding)
+        # print('y_min_upper\t', y_min_upper)
+        # print('cropped_boundary.boundary_w_min-padding\t', cropped_boundary.boundary_w_min-padding)
+        # print('x_min_upper\t', x_min_upper)
+        Z_min = np.random.randint(cropped_boundary.boundary_d_min, z_min_upper)
+        Y_min = np.random.randint(cropped_boundary.boundary_h_min, y_min_upper)
+        X_min = np.random.randint(cropped_boundary.boundary_w_min, x_min_upper)
+
+        Z_max = Z_min + input_d
+        Y_max = Y_min + input_h
+        X_max = X_min + input_w
+
+        # random select z from [cropped_boundary.boundary_d_min, cropped_boundary.boundary_d_max]
+        z_index_list = list(range(cropped_boundary.boundary_d_min, cropped_boundary.boundary_d_max+1))
+        z_index = np.random.choice(z_index_list, size[0])
+        z_index.sort()
+
+        return ct_data[z_index, Y_min: Y_max, X_min: X_max], dwi_data[z_index, Y_min: Y_max, X_min: X_max], mask_data[z_index, Y_min: Y_max, X_min: X_max]
+
+
+
     def __len__(self):
         return len(self.src_list)
 
@@ -262,10 +297,12 @@ class NCCT_GAN_MASK_DS(Dataset):
             mask_img = sitk.ReadImage(mask_file)
             mask_data = sitk.GetArrayFromImage(mask_img)
             
-            if np.random.rand() < 0.9:
+            if np.random.rand() < 0.5:
                 cropped_src, cropped_dst, cropped_mask = self.__random_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
-            else:
+            elif np.random.rand() < 0.6:
                 cropped_src, cropped_dst, cropped_mask = self.__center_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
+            else:
+                cropped_src, cropped_dst, cropped_mask = self.__random_skip_thickness_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
 
             if self.debug:
                 mid_dir = os.path.join(self.root_dir, 'tmp')
@@ -286,8 +323,9 @@ class NCCT_GAN_MASK_DS(Dataset):
             cropped_src = torch.unsqueeze(cropped_src, axis=0)
             cropped_dst = torch.from_numpy(cropped_dst).float()
             cropped_dst = torch.unsqueeze(cropped_dst, axis=0)
-            cropped_mask = torch.from_numpy(cropped_mask).float()
+            cropped_mask = torch.from_numpy(cropped_mask).float() 
             cropped_mask = torch.unsqueeze(cropped_mask, axis=0)
+
             # print('cropped_src:\t{}'.format(cropped_src.shape))
             # print('cropped_dst:\t{}'.format(cropped_dst.shape))
             # print('cropped_mask:\t{}'.format(cropped_mask.shape))

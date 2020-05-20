@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-12 11:08:38
+@LastEditTime: 2020-05-19 17:19:27
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -340,6 +340,7 @@ def ncct_extract_info_from_patient(patient_path, interval=10800):
     infos['ADC'] = []
     infos['NCCT'] = []
     infos['RAPID'] = []
+    infos['MRP'] = []
     infos['PID'] = os.path.basename(patient_path)
     selected_infos = None
     for series_uid in os.listdir(patient_path):
@@ -381,6 +382,11 @@ def ncct_extract_info_from_patient(patient_path, interval=10800):
             infos['RAPID'] = info
             info['study_uid'] = study_uid
             continue
+        if len(dcm_files) > 500 and 'ProtocolName' in metadata and 'perf' in metadata.ProtocolName:
+            info = {}
+            info['series_uid'] = series_uid
+            infos['MRP'] = info
+            info['study_uid'] = study_uid
         
         # series_uid = series_uid
         # acq_time = metadata.AcquisitionDate + metadata.AcquisitionTime
@@ -549,8 +555,8 @@ def ncct_extract_infos_from_patients_all(in_dir, out_dir):
     df.to_csv('test_3h.csv')
 
         
-    # for select_info in tqdm(all_select_infos):
-    #     patient_uid = select_info['PID']
+    for select_info in tqdm(all_select_infos):
+        patient_uid = select_info['PID']
 
     #     if len(select_info['DWI']) > 0:
     #         src_series = os.path.join(in_dir, patient_uid, select_info['DWI'][0]['series_uid'])
@@ -576,6 +582,12 @@ def ncct_extract_infos_from_patients_all(in_dir, out_dir):
     #         dst_series = os.path.join(out_dir, patient_uid, 'RAPID', select_info['RAPID']['series_uid'])
     #         os.makedirs(os.path.dirname(dst_series), exist_ok=True)
     #         shutil.copytree(src_series, dst_series)
+
+        if len(select_info['MRP']) > 0:
+            src_series = os.path.join(in_dir, patient_uid, select_info['MRP']['series_uid'])
+            dst_series = os.path.join(out_dir, patient_uid, 'MRP', select_info['MRP']['series_uid'])
+            os.makedirs(os.path.dirname(dst_series), exist_ok=True)
+            ncct_extract_mrp_subseries_from_raw_mrp_single(src_series, dst_series)
     print('====> finish ncct_extract_infos_from_patients_all!\n\n')
 
 def ncct_generate_table_all_ncct_dwi_adc_pairs(in_dir, out_dir, interval_time):
@@ -1111,6 +1123,25 @@ def ncct_extract_dwi_from_raw_dwi_single(in_dwi_path, out_dwi_path):
         dst_file = os.path.join(dwi_bxxx_dir, os.path.basename(src_file))
         shutil.copyfile(src_file, dst_file)
     return len(in_files) == (len(not_dwi_files) + len(dwi_b0_files) + len(dwi_bxxx_files)) and len(not_dwi_files) == 0
+
+
+
+def ncct_extract_mrp_subseries_from_raw_mrp_single(in_mrp_path, out_mrp_path):
+    '''
+    make sure input is mrp series
+    '''
+    in_files1 = glob(os.path.join(in_mrp_path, '*.dcm'))
+    in_files2 = glob(os.path.join(in_mrp_path, '*.DCM'))
+    in_files = in_files1 + in_files2
+    for in_file in in_files:
+        metadata = pydicom.dcmread(in_file)
+        acq_num = metadata.AcquisitionNumber
+        sub_out_dir = os.path.join(out_mrp_path, str(acq_num))
+        os.makedirs(sub_out_dir, exist_ok=True)
+        dst_file = os.path.join(sub_out_dir, os.path.basename(in_file))
+        shutil.copyfile(in_file, dst_file)
+
+
 
 
 def cta_extract_dwi_from_raw_dwi_single(in_dwi_path, out_dwi_path):
@@ -1960,7 +1991,6 @@ def cta_extract_infos_from_xlsx(info_file):
         patient_infos[pid] = patient_info
     return patient_infos
 
-
 def cta_extract_series_to_patient(indir, out_dir, info_file):
     '''
     debug: cta_extract_series_to_patient('../data/gan/hospital_6/ori', '../data/gan/hospital_6/0.raw_dcm', '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
@@ -2017,6 +2047,69 @@ def cta_extract_series_to_patient(indir, out_dir, info_file):
 
         out_dwi_series = os.path.join(out_dir, key, 'DWI', dwi_uid)
         cta_extract_dwi_from_raw_dwi_single(dwi_path, out_dwi_series)
+
+
+def cta_split_train_test_according_to_xlsx(info_file, train_config_file, test_config_file, out_file_prefix='anno'):
+    '''
+    this function is hard code!!!!!!!!
+
+    info_file = '../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx'
+    train_config_file = '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt'
+    test_config_file = '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt'
+
+    debug cmd: cta_split_train_test_according_to_xlsx('../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt')
+    '''
+    wb = xlrd.open_workbook(info_file)
+    sheet_names = wb.sheet_names()
+
+    ws = wb.sheet_by_index(0)
+    print(ws.row_values(0))
+
+    test_pids = []
+    for i_r in range(2,71):
+        pid = str(int(ws.row_values(i_r)[0]))
+        test_pids.append(pid)
+    train_list = []
+    test_list = []
+
+    def is_test(test_pids, line):
+        for pid in test_pids:
+            if pid in line:
+                return True
+        return False
+
+    with open(train_config_file) as f:
+        for line in f.readlines():
+            line = line.strip()
+            if line is None or len(line) == 0:
+                continue
+            if is_test(test_pids, line):
+                test_list.append(line)
+            else:
+                train_list.append(line)
+
+    with open(test_config_file) as f:
+        for line in f.readlines():
+            line = line.strip()
+            if line is None or len(line) == 0:
+                continue
+            if is_test(test_pids, line):
+                test_list.append(line)
+            else:
+                train_list.append(line)
+
+    print('train list:\t{}'.format(len(train_list)))
+    print('test list:\t{}'.format(len(test_list)))
+
+    outdir = os.path.dirname(train_config_file)
+    out_train_config_file = os.path.join(outdir, '{}_{}'.format(out_file_prefix, os.path.basename(train_config_file)))
+    out_test_config_file = os.path.join(outdir, '{}_{}'.format(out_file_prefix, os.path.basename(test_config_file)))
+
+    with open(out_train_config_file, 'w') as f:
+        f.write('\n'.join(train_list))
+
+    with open(out_test_config_file, 'w') as f:
+        f.write('\n'.join(test_list))
 
 
 class SeriesInfo:
@@ -2198,6 +2291,27 @@ def rapid_extract_sumary_info_multiprocess(indir, outdir):
     print('rapid count is:\t{}'.format(cnt))
     
 
+# 检查是否所有有RAPID结果的数据，都同时存在MRP数据
+def rapid_check_rapid_mrp_both_exist(indir):
+    '''
+    rapid_check_rapid_mrp_both_exist('../data/gan/hospital_4/0.raw_dcm')
+    '''
+    pids = os.listdir(indir)
+    for pid in pids:
+        patient_path = os.path.join(indir, pid)
+        if not os.path.isdir(patient_path):
+            continue
+        mrp_path = os.path.join(patient_path, 'MRP')
+        rapid_path = os.path.join(patient_path, 'RAPID')
+        if not os.path.isdir(rapid_path):
+            continue
+        if not os.path.isdir(mrp_path):
+            print(mrp_path)
+            continue
+        print('rapid:{}\tmrp:{}'.format(rapid_path, mrp_path))
+        
+
+
 # 批量修改文件名字
 def change_names_batch(indir, outdir, inpattern, outpattern):
     '''
@@ -2240,7 +2354,6 @@ def extract_mpr_singletask(infiles, outdir):
     for infile in tqdm(infiles):
         extract_mpr_one_case(infile, outdir)
 
-
 def extract_mpr_multiprocess(indir, outdir, process_num=12):
     '''
     python gan_utils.py extract_mpr_multiprocess '../data/gan/hospital_6/experiment_registration2/8.2.out/NCCT' '../data/gan/hospital_6/experiment_registration2/8.2.out/projection'
@@ -2277,7 +2390,7 @@ def test_fire(t_int, t_bool, t_str):
 
 
 if __name__ =='__main__':
-    fire.Fire()
+    # fire.Fire()
     # ncct_extract_infos_from_xlsx('../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # ncct_convert_dcm_to_niigz('../data/gan/ncct2dwi/siyuan_dcm_with_pid', '../data/gan/ncct2dwi/experiment_registration1/raw', '../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # reset_dcm_info('../data/gan/ncct2dwi/siyuan_dcm_with_pid/137611/1.3.12.2.1107.5.1.4.95874.30000016121100222306600009841', '/ssd2/zhangwd/data/brain/gan/ncct2dwi/experiment_registration1/tmp/test3', True)
@@ -2307,3 +2420,5 @@ if __name__ =='__main__':
     # test_rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm', '../data/gan/hospital_4/1.rapid')
     # extract_cerebral_parenchyma_onecase('../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity/4495700_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/tmp')
     # ncct_set_origal_point_single('../data/gan/hospital_6/experiment_registration2/1.nii_file/3833955_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori/3833955_first_BS_NCCT.nii.gz')
+    # cta_split_train_test_according_to_xlsx('../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt')
+    rapid_check_rapid_mrp_both_exist('../data/gan/hospital_4/0.raw_dcm')

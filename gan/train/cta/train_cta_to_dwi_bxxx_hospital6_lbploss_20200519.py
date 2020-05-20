@@ -35,13 +35,13 @@ class Options():
         self.num_patches_D = 5
         self.patch_size_D = [64, 64, 64]
         # crop_size
-        self.crop_size = [32, 384, 384]
+        self.crop_size = [32, 448, 448]
         # self.crop_size = [8, 8, 8]
 
         self.root_dir = '../../data/gan/hospital_6/experiment_registration2/8.2.out'
         self.config_file = '../../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt'
         self.check_point = None
-        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200514/pixel2pixel_netG_epoch_25_loss_55.2654.pth'
+        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_950_loss_9.0383.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
         # self.netG_model_path = None
         self.netD_model_path = None
@@ -61,6 +61,8 @@ def train():
             input['A'] = src_imgs
             input['B'] = dst_imgs
             # input['mask'] = mask_imgs
+            mask_imgs = mask_imgs.numpy()
+            input['lbp_mask'] = mask_imgs
             input['A_paths'] = 'A'
             input['B_paths'] = 'B'
 

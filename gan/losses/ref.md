@@ -1,0 +1,2 @@
+1. [LBP-BEGAN: A generative adversarial network architecture for infrared and visible image fusion](https://www.sciencedirect.com/science/article/pii/S1350449519305742)
+2. [Python + OpenCV 实现LBP特征提取](https://www.jianshu.com/p/039df67c2d5f)
