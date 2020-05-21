@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-19 17:19:27
+@LastEditTime: 2020-05-21 09:33:04
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -2119,6 +2119,7 @@ class SeriesInfo:
     #     self.spacing = spacing
     def __init__(self):
         super().__init__()
+        self.image = None
 
     def getInfoFromImage(self, image):
         self.origin = image.GetOrigin()
@@ -2131,14 +2132,23 @@ class SeriesInfo:
         else:
             image = sitk.ReadImage(image_file)
         self.getInfoFromImage(image)
+        self.image = image
+
+    def saveImage(self, outfile):
+        if self.image is not None:
+            sitk.WriteImage(self.image, outfile)
 
 
 
 ## rapid 相关操作
-def rapid_extract_summary_info_dcm0_core_infarct_area(dcm_file, adc_info, patient_id, out_dir):
+def rapid_extract_summary_info_dcm0_core_infarct_area(dcm_file, adc_image, patient_id, out_dir):
     '''
     核心梗死区
+    1. rapid图像分辨率256x256(spacing:0.898438\0.898438), dwi/adc分辨率192x192(spacing:1.1979166269302\1.1979166269302),可以按照倍数换算；
+    2. rapid的层数与adc的层数不一定一样；
     '''
+    from skimage import transform
+
     os.makedirs(out_dir, exist_ok=True)
     image = sitk.ReadImage(dcm_file)
     arr = sitk.GetArrayFromImage(image)
@@ -2154,43 +2164,65 @@ def rapid_extract_summary_info_dcm0_core_infarct_area(dcm_file, adc_info, patien
     [img_h, img_w] = arr.shape[1:3]
 
     assert img_w/single_w == img_w//single_w
+    background_cnt = 0
     for ih in range(4):
         for iw in range(5):
             iz = ih*5+iw
+            tmp_layer = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w:(iw+1)*single_w, :]
+            tmp_sum = np.sum(tmp_layer)
+            # print('tmp_sum:\t{}'.format(tmp_sum))
+            if tmp_sum < 10:
+                background_cnt += 1
             dwi_arr[iz,:,:, :] = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w:(iw+1)*single_w, :]
             # dwi_arr[iz,:,:, :] = arr[0, 256:512, 256:512, :]
-    dwi_img = sitk.GetImageFromArray(dwi_arr)
-    dwi_img.SetOrigin(adc_info.origin)
-    dwi_img.SetDirection(adc_info.direction)
-    dwi_img.SetSpacing(adc_info.spacing)
+    if background_cnt > 0:
+        print('{}\tbackground:\t{}'.format(dcm_file, background_cnt))
+        return False, background_cnt
+    # dwi_img = sitk.GetImageFromArray(dwi_arr)
+    # dwi_img.SetOrigin(adc_info.origin)
+    # dwi_img.SetDirection(adc_info.direction)
+    # dwi_img.SetSpacing(adc_info.spacing)
     out_dwi_file = os.path.join(out_dir, '{}_first_FU_DWI_INFARCT.nii.gz'.format(patient_id))
+    # sitk.WriteImage(dwi_img, out_dwi_file)
+    [w,h,d] = adc_image.GetSize()
+    resize_dwi_arr = np.zeros([d,h,w,3])
+    for iz in range(dwi_arr.shape[0]):
+        resize_dwi_arr[iz] = cv2.resize(dwi_arr[iz],(h,w))
+    dwi_img = sitk.GetImageFromArray(resize_dwi_arr)
+    dwi_img.CopyInformation(adc_image)
     sitk.WriteImage(dwi_img, out_dwi_file)
     infarct_mask_arr = dwi_arr[:,:,:,0] - dwi_arr[:,:,:,1]
     infarct_mask_arr[infarct_mask_arr != 255] = 0
     infarct_mask_arr[infarct_mask_arr == 255] = 1
-    infarct_mask_img = sitk.GetImageFromArray(infarct_mask_arr)
-    infarct_mask_img.SetOrigin(adc_info.origin)
-    infarct_mask_img.SetDirection(adc_info.direction)
-    infarct_mask_img.SetSpacing(adc_info.spacing)
+    resized_infarct_mask_arr = np.zeros(adc_image.GetSize()[::-1])
+    for iz in range(infarct_mask_arr.shape[0]):
+        resized_infarct_mask_arr[iz] = cv2.resize(infarct_mask_arr[iz],(h,w))
+    infarct_mask_img = sitk.GetImageFromArray(resized_infarct_mask_arr)
+    infarct_mask_img.CopyInformation(adc_image)
+    # infarct_mask_img.SetOrigin(adc_info.origin)
+    # infarct_mask_img.SetDirection(adc_info.direction)
+    # infarct_mask_img.SetSpacing(adc_info.spacing)
     infarct_mask_file = os.path.join(out_dir, '{}_first_FU_DWI_INFARCT_MASK.nii.gz'.format(patient_id))
     sitk.WriteImage(infarct_mask_img, infarct_mask_file)
 
     #检查是否存在核心梗死区
     infarct_area = np.sum(infarct_mask_arr)
     if infarct_area > 5:
-        print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
-        return True
+        # print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
+        return True, None
     else:
-        return False
-
-#    dwi_img = sitk.GetImageFromArray(dwi_arr)
-#    sitk.WriteImage(dwi_img, 'test.nii.gz')
+        return False, None
 
 
-def rapid_extract_summary_info_dcm0_ischemic_penumbra(dcm_file, adc_info, patient_id, out_dir):
+
+def rapid_extract_summary_info_dcm0_ischemic_penumbra(dcm_file, adc_image, patient_id, out_dir):
     '''
-    缺血半暗带
+    核心梗死区
+    1. rapid图像分辨率256x256(spacing:0.898438\0.898438), dwi/adc分辨率192x192(spacing:1.1979166269302\1.1979166269302),可以按照倍数换算；
+    2. rapid的层数与adc的层数不一定一样；
     '''
+    from skimage import transform
+
     os.makedirs(out_dir, exist_ok=True)
     image = sitk.ReadImage(dcm_file)
     arr = sitk.GetArrayFromImage(image)
@@ -2206,41 +2238,118 @@ def rapid_extract_summary_info_dcm0_ischemic_penumbra(dcm_file, adc_info, patien
     [img_h, img_w] = arr.shape[1:3]
 
     assert img_w/single_w == img_w//single_w
+    background_cnt = 0
     bias_w = 256*5
     for ih in range(4):
         for iw in range(5):
             iz = ih*5+iw
+            tmp_layer = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w:(iw+1)*single_w, :]
+            tmp_sum = np.sum(tmp_layer)
+            # print('tmp_sum:\t{}'.format(tmp_sum))
+            if tmp_sum < 10:
+                background_cnt += 1
             dwi_arr[iz,:,:, :] = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w+bias_w:(iw+1)*single_w+bias_w, :]
             # dwi_arr[iz,:,:, :] = arr[0, 256:512, 256:512, :]
-    dwi_img = sitk.GetImageFromArray(dwi_arr)
-    dwi_img.SetOrigin(adc_info.origin)
-    dwi_img.SetDirection(adc_info.direction)
-    dwi_img.SetSpacing(adc_info.spacing)
+    # print('background:\t{}'.format(background_cnt))
+    if background_cnt > 0:
+        print('{}\tbackground:\t{}'.format(dcm_file, background_cnt))
+        return False, background_cnt
+    # dwi_img = sitk.GetImageFromArray(dwi_arr)
+    # dwi_img.SetOrigin(adc_info.origin)
+    # dwi_img.SetDirection(adc_info.direction)
+    # dwi_img.SetSpacing(adc_info.spacing)
     out_dwi_file = os.path.join(out_dir, '{}_first_FU_ISCHEMIC_PENUMBRA.nii.gz'.format(patient_id))
+    # sitk.WriteImage(dwi_img, out_dwi_file)
+    [w,h,d] = adc_image.GetSize()
+    resize_dwi_arr = np.zeros([d,h,w,3])
+    for iz in range(dwi_arr.shape[0]):
+        resize_dwi_arr[iz] = cv2.resize(dwi_arr[iz],(h,w))
+    dwi_img = sitk.GetImageFromArray(resize_dwi_arr)
+    dwi_img.CopyInformation(adc_image)
     sitk.WriteImage(dwi_img, out_dwi_file)
     infarct_mask_arr = dwi_arr[:,:,:,1] - dwi_arr[:,:,:,0]
     infarct_mask_arr[infarct_mask_arr != 255] = 0
     infarct_mask_arr[infarct_mask_arr == 255] = 1
-    infarct_mask_img = sitk.GetImageFromArray(infarct_mask_arr)
-    infarct_mask_img.SetOrigin(adc_info.origin)
-    infarct_mask_img.SetDirection(adc_info.direction)
-    infarct_mask_img.SetSpacing(adc_info.spacing)
+    resized_infarct_mask_arr = np.zeros(adc_image.GetSize()[::-1])
+    for iz in range(infarct_mask_arr.shape[0]):
+        resized_infarct_mask_arr[iz] = cv2.resize(infarct_mask_arr[iz],(h,w))
+    infarct_mask_img = sitk.GetImageFromArray(resized_infarct_mask_arr)
+    infarct_mask_img.CopyInformation(adc_image)
+    # infarct_mask_img.SetOrigin(adc_info.origin)
+    # infarct_mask_img.SetDirection(adc_info.direction)
+    # infarct_mask_img.SetSpacing(adc_info.spacing)
     infarct_mask_file = os.path.join(out_dir, '{}_first_FU_ISCHEMIC_PENUMBRA_MASK.nii.gz'.format(patient_id))
     sitk.WriteImage(infarct_mask_img, infarct_mask_file)
 
     #检查是否存在核心梗死区
     infarct_area = np.sum(infarct_mask_arr)
     if infarct_area > 5:
-        print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
-        return True
+        # print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
+        return True, None
     else:
-        return False
+        return False, None
+
+
+# def rapid_extract_summary_info_dcm0_ischemic_penumbra(dcm_file, adc_info, patient_id, out_dir):
+#     '''
+#     缺血半暗带
+#     '''
+#     os.makedirs(out_dir, exist_ok=True)
+#     image = sitk.ReadImage(dcm_file)
+#     arr = sitk.GetArrayFromImage(image)
+    
+#     dwi_arr = np.zeros([20, 256, 256, 3], dtype=np.uint8)
+
+#     mask_arr = np.zeros([20, 256, 256], dtype=np.uint8)
+#     # 图像从中间分开, 一行20例数据，其中五例dwi, 五例mrp
+#     # 四行，一共20例数据, 每例数据的size:256x256
+#     single_h = 256
+#     single_w = 256
+
+#     [img_h, img_w] = arr.shape[1:3]
+
+#     assert img_w/single_w == img_w//single_w
+#     bias_w = 256*5
+#     for ih in range(4):
+#         for iw in range(5):
+#             iz = ih*5+iw
+#             dwi_arr[iz,:,:, :] = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w+bias_w:(iw+1)*single_w+bias_w, :]
+#             # dwi_arr[iz,:,:, :] = arr[0, 256:512, 256:512, :]
+#     dwi_img = sitk.GetImageFromArray(dwi_arr)
+#     dwi_img.SetOrigin(adc_info.origin)
+#     dwi_img.SetDirection(adc_info.direction)
+#     dwi_img.SetSpacing(adc_info.spacing)
+#     out_dwi_file = os.path.join(out_dir, '{}_first_FU_ISCHEMIC_PENUMBRA.nii.gz'.format(patient_id))
+#     sitk.WriteImage(dwi_img, out_dwi_file)
+#     infarct_mask_arr = dwi_arr[:,:,:,1] - dwi_arr[:,:,:,0]
+#     infarct_mask_arr[infarct_mask_arr != 255] = 0
+#     infarct_mask_arr[infarct_mask_arr == 255] = 1
+#     infarct_mask_img = sitk.GetImageFromArray(infarct_mask_arr)
+#     infarct_mask_img.SetOrigin(adc_info.origin)
+#     infarct_mask_img.SetDirection(adc_info.direction)
+#     infarct_mask_img.SetSpacing(adc_info.spacing)
+#     infarct_mask_file = os.path.join(out_dir, '{}_first_FU_ISCHEMIC_PENUMBRA_MASK.nii.gz'.format(patient_id))
+#     sitk.WriteImage(infarct_mask_img, infarct_mask_file)
+
+#     #检查是否存在核心梗死区
+#     infarct_area = np.sum(infarct_mask_arr)
+#     if infarct_area > 5:
+#         print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
+#         return True
+#     else:
+#         return False
     
 
-def rapid_extract_sumary_info(rapid_series_path, adc_info, patient_id, outdir):
+def rapid_extract_sumary_info(rapid_series_path, adc_path, patient_id, outdir):
     '''
     rapid_series_path: '../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316'
     debug: rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316')
+
+
+    return val:
+        val 0: 是否有核心梗死区
+        val 1: 是否有缺血半暗带
+        val 2: 是否能够和ADC/DWI图像进行匹配
     '''
     rapid_files1 = glob(os.path.join(rapid_series_path, '*.DCM'))
     rapid_files2 = glob(os.path.join(rapid_series_path, '*.dcm'))
@@ -2249,16 +2358,20 @@ def rapid_extract_sumary_info(rapid_series_path, adc_info, patient_id, outdir):
     rapid_files.sort()
 
     rapid_file = rapid_files[0]
-    rapid_extract_summary_info_dcm0_core_infarct_area(rapid_files[0], adc_info, patient_id, outdir)
-    rapid_extract_summary_info_dcm0_ischemic_penumbra(rapid_files[0], adc_info, patient_id, outdir)
-
-    print('hello world!')
+    adc_image = read_dcm_file(adc_path)
+    is_infcrct, is_infcrct_match = rapid_extract_summary_info_dcm0_core_infarct_area(rapid_files[0], adc_image, patient_id, outdir)
+    is_penumbra, is_penumbra_match = rapid_extract_summary_info_dcm0_ischemic_penumbra(rapid_files[0], adc_image, patient_id, outdir)
+    out_adc_file = os.path.join(outdir, '{}_ADC.nii.gz'.format(patient_id))
+    sitk.WriteImage(adc_image, out_adc_file)
+    return is_infcrct, is_penumbra, is_infcrct_match
 
 def rapid_extract_sumary_info_multiprocess(indir, outdir):
     '''
-    rapid_extract_sumary_info_multiprocess('../data/gan/hospital_4/0.raw_dcm', '../data/gan/hospital_4/1.rapid')
+    debug cmd: rapid_extract_sumary_info_multiprocess('../data/gan/hospital_4/0.raw_dcm', '../data/gan/hospital_4/1.rapid')
+    invoke cmd: python gan_utils.py rapid_extract_sumary_info_multiprocess '../data/gan/hospital_4/0.raw_dcm' '../data/gan/hospital_4/1.rapid'
     '''
     cnt = 0
+    config_infos = []
     for patient_id in os.listdir(indir):
         patient_path = os.path.join(indir, patient_id)
         if not os.path.isdir(patient_path):
@@ -2283,11 +2396,19 @@ def rapid_extract_sumary_info_multiprocess(indir, outdir):
             continue
         if not os.path.isdir(adc_path):
             continue
-        adc_info = SeriesInfo()
-        adc_info.getInfoFromImageFile(adc_path, is_dcm=True)
-        rapid_extract_sumary_info(series_path, adc_info, patient_id, outdir)
+        # adc_info = SeriesInfo()
+        # adc_info.getInfoFromImageFile(adc_path, is_dcm=True)
+        # out_adc_file = os.path.join(outdir, '{}_ADC.nii.gz'.format(patient_id))
+        # adc_info.saveImage(out_adc_file)
+        is_infcrct, is_penumbra, is_infcrct_match = rapid_extract_sumary_info(series_path, adc_path, patient_id, outdir)
+        if is_infcrct_match is not None:
+            continue
+        config_info = '{}\t{}\t{}'.format(patient_id, is_infcrct, is_penumbra)
+        config_infos.append(config_info)
         cnt += 1
         # break
+    with open(os.path.join(outdir, 'config.txt'), 'w') as f:
+        f.write('\n'.join(config_infos))
     print('rapid count is:\t{}'.format(cnt))
     
 
@@ -2361,7 +2482,6 @@ def extract_mpr_multiprocess(indir, outdir, process_num=12):
     '''
 
     infiles = glob(os.path.join(indir, '*.nii.gz'))
-
     import multiprocessing
     from multiprocessing import Process
     multiprocessing.freeze_support()
@@ -2390,7 +2510,7 @@ def test_fire(t_int, t_bool, t_str):
 
 
 if __name__ =='__main__':
-    # fire.Fire()
+    fire.Fire()
     # ncct_extract_infos_from_xlsx('../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # ncct_convert_dcm_to_niigz('../data/gan/ncct2dwi/siyuan_dcm_with_pid', '../data/gan/ncct2dwi/experiment_registration1/raw', '../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # reset_dcm_info('../data/gan/ncct2dwi/siyuan_dcm_with_pid/137611/1.3.12.2.1107.5.1.4.95874.30000016121100222306600009841', '/ssd2/zhangwd/data/brain/gan/ncct2dwi/experiment_registration1/tmp/test3', True)
@@ -2421,4 +2541,5 @@ if __name__ =='__main__':
     # extract_cerebral_parenchyma_onecase('../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity/4495700_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/tmp')
     # ncct_set_origal_point_single('../data/gan/hospital_6/experiment_registration2/1.nii_file/3833955_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori/3833955_first_BS_NCCT.nii.gz')
     # cta_split_train_test_according_to_xlsx('../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt')
-    rapid_check_rapid_mrp_both_exist('../data/gan/hospital_4/0.raw_dcm')
+    # rapid_check_rapid_mrp_both_exist('../data/gan/hospital_4/0.raw_dcm')
+    # rapid_extract_sumary_info_multiprocess('../data/gan/hospital_4_2/0.raw_dcm', '../data/gan/hospital_4_2/1.rapid')

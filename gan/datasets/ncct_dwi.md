@@ -121,3 +121,17 @@ python gan_utils.py ncct_genereate_cta2dwi_config_file_with_cerebral_parenchyma 
 
 python cta_to_dwi_dataset.py calculate_crop_range ../data/gan/hospital_4/experiment_registration2/8.out/config/ncct_to_dwi_b0_train_config_file.txt
 ```
+
+
+## 核心梗死区和半暗带相关信息提取
+
+- [ ] 1. 提取核心梗死区和半暗带的mask
+    * 调用命令`invoke cmd: python gan_utils.py rapid_extract_sumary_info_multiprocess '../data/gan/hospital_4/0.raw_dcm' '../data/gan/hospital_4/experiment_registration3/1.rapid'`
+- [ ] 2. 将起点设置为0
+    * 调用命令`python gan_utils.py ncct_set_original_point '../data/gan/hospital_4/experiment_registration3/1.rapid' '../data/gan/hospital_4/experiment_registration3/2.nii_file_ori'`
+- [ ] 3. 配准
+    * 调用命令`ln -s ../data/gan/hospital_4/experiment_registration3/2.nii_file_ori ../data/gan/hospital_4/experiment_registration3/4 Patient_nii_unity`
+    * 调用命令`python gan_ncct_rapid_rigid_align.py`, 生成的数据位于`../data/gan/hospital_4/experiment_registration3/5 dwi_rigid_align_ncct`
+- [ ] 4. 生成界面图片以便查看配准是否正确
+    * 调用命令`python gan_utils.py extract_mpr_multiprocess '../data/gan/hospital_4/experiment_registration3/5 dwi_rigid_align_ncct' '../data/gan/hospital_4/experiment_registration3/8.2.out/projection'`
+    * 经查看hospital_4_2中问题图片:'398774', '448646', '458192'
