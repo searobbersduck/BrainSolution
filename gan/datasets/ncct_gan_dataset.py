@@ -297,9 +297,9 @@ class NCCT_GAN_MASK_DS(Dataset):
             mask_img = sitk.ReadImage(mask_file)
             mask_data = sitk.GetArrayFromImage(mask_img)
             
-            if np.random.rand() < 0.5:
+            if np.random.rand() < 0.9:
                 cropped_src, cropped_dst, cropped_mask = self.__random_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
-            elif np.random.rand() < 0.6:
+            elif np.random.rand() < 0.99:
                 cropped_src, cropped_dst, cropped_mask = self.__center_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
             else:
                 cropped_src, cropped_dst, cropped_mask = self.__random_skip_thickness_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])

@@ -62,7 +62,7 @@ class NCCTDWISegmentationDS(Dataset):
     def __getitem__(self, idx):
         if self.phase == 'train':
             src_file = self.pos_images_list[idx]
-            mask_file = self.neg_masks_list[idx]
+            mask_file = self.pos_masks_list[idx]
             src_img = sitk.ReadImage(src_file)
             src_data = sitk.GetArrayFromImage(src_img)
             mask_img = sitk.ReadImage(mask_file)
@@ -70,9 +70,19 @@ class NCCTDWISegmentationDS(Dataset):
             [d,w,h] = src_data.shape
             cropped_boundary = CroppedBoundary(0,d-1,0,h-1,0,w-1)
             Z_min, Z_max, Y_min, Y_max, X_min, X_max = CropUtils.get_region_3d_random_crop(self.crop_size, cropped_boundary)
+            
             cropped_src = src_data[Z_min: Z_max, Y_min: Y_max, X_min: X_max]
             cropped_mask = mask_data[Z_min: Z_max, Y_min: Y_max, X_min: X_max]
-            
+            cropped_mask[cropped_mask>0.3]=1
+            cropped_mask[cropped_mask<0.3]=0
+            # print('\n{}\t{}\t{}\t{}\t{}\t{}'.format(Z_min, Z_max, Y_min, Y_max, X_min, X_max))
+            # print(cropped_src.shape)
+            # print(cropped_mask.shape)
+            # print(src_data.shape)
+            # print(mask_data.shape)
+            # print(src_file)
+            # print(mask_file)
+
             cropped_src = torch.from_numpy(cropped_src).float()
             cropped_src = torch.unsqueeze(cropped_src, axis=0)
 
@@ -136,8 +146,9 @@ def test_NCCTDWISegmentationDS():
     crop_size = [64,64,64]
     ds = NCCTCoreInfarctSegmentation(root_dir, config_file, phase, crop_size)
     data_loader = DataLoader(ds, num_workers=opt.num_workers, batch_size=opt.batch_size, pin_memory=True, shuffle=True)
-    for i, (srcs, masks, _, _) in tqdm(enumerate(data_loader)):
-        print(srcs.shape)
+    for _ in range(20):
+        for i, (srcs, masks, _, _) in tqdm(enumerate(data_loader)):
+            print(srcs.shape)
 
 
 if __name__ == '__main__':
