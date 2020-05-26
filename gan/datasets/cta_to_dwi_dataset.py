@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-03-27 17:01:15
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-09 14:59:04
+@LastEditTime: 2020-05-26 14:39:21
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -690,7 +690,7 @@ def extract_region_by_mask_cut_multiprocess(maskdir, srcdir, outdir, maskpattern
     num_per_process = (len(mask_files) + process_num - 1)//process_num
 
     for i in range(process_num):
-        sub_infiles = mask_files[num_per_process*i:min(num_per_process*(i+1), len(mask_files)-1)]
+        sub_infiles = mask_files[num_per_process*i:min(num_per_process*(i+1), len(mask_files))]
         print(sub_infiles)
         result = pool.apply_async(extract_region_by_mask_cut_singletask, args=(sub_infiles,srcdir, outdir, maskpattern, srcpattern))
         results.append(result)

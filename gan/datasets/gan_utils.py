@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-21 09:33:04
+@LastEditTime: 2020-05-26 15:02:16
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -1142,6 +1142,40 @@ def ncct_extract_mrp_subseries_from_raw_mrp_single(in_mrp_path, out_mrp_path):
         shutil.copyfile(in_file, dst_file)
 
 
+def cta_extract_exotic_flower_dwi(series_path):
+    dcm_files = os.listdir(series_path)
+    assert(len(dcm_files)%2 == 0)
+    info_np = np.zeros((len(dcm_files),6))
+    for j in range(len(dcm_files)):
+        info_np[j,0] = j
+        dcm_file = os.path.join(series_path, dcm_files[j])
+        metadata = pydicom.dcmread(dcm_file)
+        info_np[j,3] = float(metadata.WindowWidth)
+        info_np[j,4] = float(metadata.WindowCenter)
+        info_np[j,5] = float(metadata.SliceLocation)
+        img = sitk.ReadImage(dcm_file)
+        arr = sitk.GetArrayFromImage(img)
+        info_np[j,2] = np.max(arr)
+        info_np[j,1] = np.min(arr)
+    sort_info = info_np[np.argsort(info_np[:,-1])]
+    dwi_bxxx_files = []
+    dwi_b0_files = []
+    for j in range(sort_info.shape[0]//2):
+        minus = sort_info[2*j,2:5]-sort_info[2*j+1, 2:5]
+        p = (minus>0)*1
+        xp = np.sum(p)
+        assert(xp == 3 or xp == 0)
+        if xp == 3:
+            out_indx = sort_info[2*j+1, 0]
+        else:
+            out_indx = sort_info[2*j,0]
+        dwi_bxxx_files.append(dcm_files[int(out_indx)])
+    for f in dcm_files:
+        if f not in dwi_bxxx_files:
+            dwi_b0_files.append(f)
+    dwi_b0_files = [os.path.join(series_path, i) for i in dwi_b0_files]
+    dwi_bxxx_files = [os.path.join(series_path, i) for i in dwi_bxxx_files]
+    return dwi_b0_files, dwi_bxxx_files
 
 
 def cta_extract_dwi_from_raw_dwi_single(in_dwi_path, out_dwi_path):
@@ -1163,7 +1197,7 @@ def cta_extract_dwi_from_raw_dwi_single(in_dwi_path, out_dwi_path):
         #     not_dwi_files.append(in_file)
         #     continue
         try:            
-            if 'SequenceName' in metadata:
+            if 'SequenceName' in metadata and metadata.SequenceName != '':
                 seq_name = metadata.SequenceName
                 if 'b0' in seq_name:
                     dwi_b0_files.append(in_file)
@@ -1179,6 +1213,11 @@ def cta_extract_dwi_from_raw_dwi_single(in_dwi_path, out_dwi_path):
                 not_dwi_files.append(in_file)
         except:
             pass
+    
+    if len(not_dwi_files) > 0 and len(dwi_bxxx_files) == 0:
+        dwi_b0_files, dwi_bxxx_files = cta_extract_exotic_flower_dwi(in_dwi_path)
+        not_dwi_files = []
+    
     # assert len(in_files) == (len(not_dwi_files) + len(dwi_b0_files) + len(dwi_bxxx_files))
     not_dwi_dir = os.path.join(out_dwi_path, 'not_dwi')
     os.makedirs(not_dwi_dir, exist_ok=True)
@@ -1561,6 +1600,7 @@ def ncct_generate_cerebral_parenchyma_middle_layer_multiprocess(indir, outdir, i
 
     for i in range(process_num):
         sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
+        print(sub_infiles)
         result = pool.apply_async(ncct_generate_cerebral_parenchyma_middle_layer_single, args=(sub_infiles, outdir))
         results.append(result)
 
@@ -2044,6 +2084,9 @@ def cta_extract_series_to_patient(indir, out_dir, info_file):
             continue
         out_ncct_series = os.path.join(out_dir, key, 'NCCT', cta_uid)
         shutil.copytree(cta_path, out_ncct_series)
+        not_exist_list = ['2602401', '3878650', '1847547', '3926192', '2123180', '3835991', '4023216']
+        if key not in not_exist_list:
+            continue
 
         out_dwi_series = os.path.join(out_dir, key, 'DWI', dwi_uid)
         cta_extract_dwi_from_raw_dwi_single(dwi_path, out_dwi_series)
@@ -2058,6 +2101,7 @@ def cta_split_train_test_according_to_xlsx(info_file, train_config_file, test_co
     test_config_file = '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt'
 
     debug cmd: cta_split_train_test_according_to_xlsx('../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt')
+    invoke cmd: python gan_utils.py cta_split_train_test_according_to_xlsx '../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx' '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt' '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt'
     '''
     wb = xlrd.open_workbook(info_file)
     sheet_names = wb.sheet_names()
@@ -2066,6 +2110,8 @@ def cta_split_train_test_according_to_xlsx(info_file, train_config_file, test_co
     print(ws.row_values(0))
 
     test_pids = []
+    test_exist = []
+    test_not_exist = []
     for i_r in range(2,71):
         pid = str(int(ws.row_values(i_r)[0]))
         test_pids.append(pid)
@@ -2075,16 +2121,18 @@ def cta_split_train_test_according_to_xlsx(info_file, train_config_file, test_co
     def is_test(test_pids, line):
         for pid in test_pids:
             if pid in line:
-                return True
-        return False
+                return pid
+        return None
 
     with open(train_config_file) as f:
         for line in f.readlines():
             line = line.strip()
             if line is None or len(line) == 0:
                 continue
-            if is_test(test_pids, line):
+            pid = is_test(test_pids, line)
+            if pid is not None:
                 test_list.append(line)
+                test_exist.append(pid)
             else:
                 train_list.append(line)
 
@@ -2093,10 +2141,18 @@ def cta_split_train_test_according_to_xlsx(info_file, train_config_file, test_co
             line = line.strip()
             if line is None or len(line) == 0:
                 continue
-            if is_test(test_pids, line):
+            pid = is_test(test_pids, line)
+            if  pid is not None:
                 test_list.append(line)
+                test_exist.append(pid)
             else:
                 train_list.append(line)
+
+    for t in test_pids:
+        if t not in test_exist:
+            test_not_exist.append(t)
+
+    print('====> pid not exist:\t{}'.format(test_not_exist))
 
     print('train list:\t{}'.format(len(train_list)))
     print('test list:\t{}'.format(len(test_list)))
@@ -2535,6 +2591,7 @@ if __name__ =='__main__':
     # ncct_generate_table_all_series('../data/gan/hospital_4/0.ori', '../data/gan/hospital_4/0.table')
     # ncct_generate_cerebral_parenchyma_middle_layer_onecase('../data/gan/hospital_4/experiment_registration2/5 dwi_rigid_align_ncct/406862_first_BS_brain.nii.gz', None)
     # cta_extract_infos_from_xlsx('../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
+    ## 调试：文件下有大量的CTA和DWI序列，将这些散乱的数据一一配对
     # cta_extract_series_to_patient('../data/gan/hospital_6/ori', '../data/gan/hospital_6/0.raw_dcm', '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
     # rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316')
     # test_rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm', '../data/gan/hospital_4/1.rapid')
@@ -2543,3 +2600,5 @@ if __name__ =='__main__':
     # cta_split_train_test_according_to_xlsx('../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt')
     # rapid_check_rapid_mrp_both_exist('../data/gan/hospital_4/0.raw_dcm')
     # rapid_extract_sumary_info_multiprocess('../data/gan/hospital_4_2/0.raw_dcm', '../data/gan/hospital_4_2/1.rapid')
+    ## 调试将DWI的b0和b1000数据区分开
+    # cta_extract_dwi_from_raw_dwi_single('../data/gan/hospital_6/0.raw_dcm/3926192/DWI/1.3.46.670589.11.17277.5.0.5008.2017041707551310621/not_dwi', None)

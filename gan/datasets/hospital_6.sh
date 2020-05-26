@@ -8,7 +8,7 @@ ln -s '/ssd2/zhangwd/data/brain/gan/hospital_6/experiment_registration2/2.nii_fi
 CUDA_VISIBLE_DEVICES=2 python gan_utils.py extract_cerebral_parenchyma_multiprocess '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' _NCCT.nii.gz _brain.nii.gz
 
 # python gan_utils.py change_names_batch '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '_NCCT.nii.gz' '_NCCT_bk.nii.gz'
-# python gan_utils.py change_names_batch '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '_NCCT.nii.gz' '_NCCT_bk.nii.gz'
+# python gan_utils.py change_names_batch '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity' '_NCCT_crop.nii.gz' '_NCCT.nii.gz'
 
 # python gan_cta_rigid_align.py
 
