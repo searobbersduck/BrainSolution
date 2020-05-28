@@ -135,3 +135,22 @@ python cta_to_dwi_dataset.py calculate_crop_range ../data/gan/hospital_4/experim
 - [ ] 4. 生成界面图片以便查看配准是否正确
     * 调用命令`python gan_utils.py extract_mpr_multiprocess '../data/gan/hospital_4/experiment_registration3/5 dwi_rigid_align_ncct' '../data/gan/hospital_4/experiment_registration3/8.2.out/projection'`
     * 经查看hospital_4_2中问题图片:'398774', '448646', '458192'
+4院第一批数据的批处理脚本
+```
+python gan_utils.py rapid_extract_sumary_info_multiprocess '../data/gan/hospital_4/0.raw_dcm' '../data/gan/hospital_4/experiment_registration3/1.rapid'
+python gan_utils.py rapid_stat_dwi_positive_count_according_to_config '../data/gan/hospital_4/1.rapid/config.txt'
+python gan_utils.py ncct_set_original_point '../data/gan/hospital_4/experiment_registration3/1.rapid' '../data/gan/hospital_4/experiment_registration3/2.nii_file_ori'
+ln -s ../data/gan/hospital_4/experiment_registration3/2.nii_file_ori ../data/gan/hospital_4/experiment_registration3/4 Patient_nii_unity
+python gan_ncct_rapid_rigid_align.py
+python gan_utils.py extract_mpr_multiprocess '../data/gan/hospital_4/experiment_registration3/5 dwi_rigid_align_ncct' '../data/gan/hospital_4/experiment_registration3/8.2.out/projection
+```
+
+4院第二批数据的批处理脚本
+```
+python gan_utils.py rapid_extract_sumary_info_multiprocess '../data/gan/hospital_4_2/0.raw_dcm' '../data/gan/hospital_4_2/experiment_registration3/1.rapid'
+python gan_utils.py rapid_stat_dwi_positive_count_according_to_config '../data/gan/hospital_4_2/1.rapid/config.txt'
+python gan_utils.py ncct_set_original_point '../data/gan/hospital_4_2/experiment_registration3/1.rapid' '../data/gan/hospital_4_2/experiment_registration3/2.nii_file_ori'
+ln -s ../data/gan/hospital_4_2/experiment_registration3/2.nii_file_ori ../data/gan/hospital_4_2/experiment_registration3/4 Patient_nii_unity
+python gan_ncct_rapid_rigid_align.py
+python gan_utils.py extract_mpr_multiprocess '../data/gan/hospital_4_2/experiment_registration3/5 dwi_rigid_align_ncct' '../data/gan/hospital_4_2/experiment_registration3/8.2.out/projection
+```

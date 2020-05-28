@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-26 15:02:16
+@LastEditTime: 2020-05-28 10:11:26
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -1546,8 +1546,8 @@ def ncct_generate_cerebral_parenchyma_middle_layer_onecase(infile, outfile):
     for z in range(5, in_arr.shape[0]-5):
         for y in range(in_arr.shape[1]):
             x_arr = in_arr[z,y,:]
-            # low_thres = 0
-            low_thres = -1024
+            low_thres = 0
+            # low_thres = -1024
             ranges = np.where(x_arr != low_thres)
             if len(ranges[0]) > 0:
                 [x_min] = np.min(ranges, axis=1)
@@ -1768,6 +1768,69 @@ def ncct_genereate_cta2dwi_config_file_with_cerebral_parenchyma(indir, configdir
     write_config_file(config_mask_ncct_to_dwi_bxxx_infos, train_ratio, 'mask_ncct_to_dwi_bxxx_')
     write_config_file(config_mask_ncct_to_adc_infos, train_ratio, 'mask_ncct_to_adc_')
     print('finish ncct_genereate_cta2dwi_config_file_with_cerebral_parenchyma!')
+
+
+def ncct_split_train_test_according_to_rapid_result(train_config_file, test_config_file, rapid_config_file):
+    '''
+    debug cmd: ncct_split_train_test_according_to_rapid_result('../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../data/gan/hospital_4/experiment_registration3/1.rapid/config.txt')
+    invoke cmd: s
+    '''
+    infarct_pids = []
+    penumbra_pids = []
+    positive_pids = []
+    with open(rapid_config_file) as f:
+        for line in f.readlines():
+            line = line.strip()
+            if line is None or len(line) == 0:
+                continue
+            ss = line.split('\t')
+            if ss[1] == 'True':
+                infarct_pids.append(ss[0])
+            if ss[2] == 'True':
+                penumbra_pids.append(ss[0])
+            if ss[1] == 'True' or ss[2] == 'True':
+                positive_pids.append(ss[0])
+                
+    def is_test(test_pids, line):
+        for pid in test_pids:
+            if pid in line:
+                return pid
+        return None
+
+    test_pids = positive_pids
+
+    positive_list = []
+
+    with open(train_config_file) as f:
+        for line in f.readlines():
+            line = line.strip()
+            if line is None or len(line) == 0:
+                continue
+            pid = is_test(test_pids, line)
+            if pid is not None:
+                positive_list.append(line)
+            else:
+                pass
+
+    with open(test_config_file) as f:
+        for line in f.readlines():
+            line = line.strip()
+            if line is None or len(line) == 0:
+                continue
+            pid = is_test(test_pids, line)
+            if pid is not None:
+                positive_list.append(line)
+            else:
+                pass
+
+    out_dir = os.path.dirname(train_config_file)
+    out_file = os.path.join(out_dir, 'positive_{}'.format(os.path.basename(train_config_file)))
+    with open(out_file, 'w') as f:
+        f.write('\n'.join(positive_list))
+    
+    
+    
+
 
 def split_dicoms_by_series_uid(indir, outdir, inpattern='*.dcm'):
     '''
@@ -2487,7 +2550,66 @@ def rapid_check_rapid_mrp_both_exist(indir):
             continue
         print('rapid:{}\tmrp:{}'.format(rapid_path, mrp_path))
         
+# 统计包含病变的数据数目
+def rapid_stat_dwi_positive_count_according_to_config(config_file):
+    '''
+    config file format as follows:
+    pid     是否包含核心梗死区  是否包含缺血半暗带
+    456926  False   False
+    392112  False   False
+    270200  False   False
+    124639  False   False
+    450950  False   False
+    447276  False   False
+    452468  False   False
+    316872  False   False
+    446273  False   True
+    '''
+    '''
 
+    debug cmd: rapid_stat_dwi_positive_count_according_to_config('../data/gan/hospital_4/1.rapid/config.txt')
+    invoke cmd: python gan_utils.py rapid_stat_dwi_positive_count_according_to_config '../data/gan/hospital_4/1.rapid/config.txt'
+
+    4院第一批数据（hospital_4）的运行结果如下：
+
+    hospital 4 ncct dwi pairs total count:  51
+    hospital 4 ncct dwi pairs include infarct count:        12
+    hospital 4 ncct dwi pairs include penumbra count:       25
+    hospital 4 ncct dwi pairs positive count:       26
+
+
+    debug cmd: rapid_stat_dwi_positive_count_according_to_config('../data/gan/hospital_4_2/1.rapid/config.txt')
+    invoke cmd: python gan_utils.py rapid_stat_dwi_positive_count_according_to_config '../data/gan/hospital_4_2/1.rapid/config.txt'
+
+    4院第二批数据（hospital_4_2）的运行结果如下：
+    hospital 4 ncct dwi pairs total count:  133
+    hospital 4 ncct dwi pairs include infarct count:        29
+    hospital 4 ncct dwi pairs include penumbra count:       52
+    hospital 4 ncct dwi pairs positive count:       60
+    '''
+    total_cnt = 0
+    infarct_cnt = 0
+    penumbra_cnt = 0
+    positive_cnt = 0
+    with open(config_file) as f:
+        for line in f.readlines():
+            line = line.strip()
+            if line is None or len(line) == 0:
+                continue
+            ss = line.split('\t')
+            if ss[1] == 'True':
+                infarct_cnt += 1
+            if ss[2] == 'True':
+                penumbra_cnt += 1
+            if ss[1] == 'True' or ss[2] == 'True':
+                positive_cnt += 1
+            total_cnt += 1
+    print('hospital 4 ncct dwi pairs total count:\t{}'.format(total_cnt))
+    print('hospital 4 ncct dwi pairs include infarct count:\t{}'.format(infarct_cnt))
+    print('hospital 4 ncct dwi pairs include penumbra count:\t{}'.format(penumbra_cnt))
+    print('hospital 4 ncct dwi pairs positive count:\t{}'.format(positive_cnt))
+    
+            
 
 # 批量修改文件名字
 def change_names_batch(indir, outdir, inpattern, outpattern):
@@ -2602,3 +2724,5 @@ if __name__ =='__main__':
     # rapid_extract_sumary_info_multiprocess('../data/gan/hospital_4_2/0.raw_dcm', '../data/gan/hospital_4_2/1.rapid')
     ## 调试将DWI的b0和b1000数据区分开
     # cta_extract_dwi_from_raw_dwi_single('../data/gan/hospital_6/0.raw_dcm/3926192/DWI/1.3.46.670589.11.17277.5.0.5008.2017041707551310621/not_dwi', None)
+    # rapid_stat_dwi_positive_count_according_to_config('../data/gan/hospital_4_2/1.rapid/config.txt')
+    # ncct_split_train_test_according_to_rapid_result('../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../data/gan/hospital_4/experiment_registration3/1.rapid/config.txt')

@@ -57,6 +57,7 @@ class Options():
         # self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_300_loss_7.5488.pth'
         self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_950_loss_9.0383.pth'
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200515/pixel2pixel_netG_epoch_900_loss_9.4380.pth'
+        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200526/pixel2pixel_netG_epoch_100_loss_8.1019.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
         # self.netG_model_path = None
         self.netD_model_path = None
@@ -138,7 +139,7 @@ def batch_predict_cta(root_dir, config_file, outdir):
     for i in tqdm(range(len(ct_list))):
         ct_file = ct_list[i]
         gt_dwi_file = gt_dwi_list[i]
-        # predict(ct_file, outdir)
+        predict(ct_file, outdir)
         dst_gt_dwi_file = os.path.join(outdir, os.path.basename(gt_dwi_file))
         dst_ct_file = os.path.join(outdir, os.path.basename(ct_file))
         shutil.copyfile(gt_dwi_file, dst_gt_dwi_file)
@@ -193,6 +194,11 @@ if __name__ == '__main__':
     # predict('../../data/gan/hospital_4_2/experiment_registration2/8.out/NCCT/441128_first_BS_NCCT.nii.gz', '../../data/gan/hospital_4/experiment_registration2/10.predict')
     # predict('../../data/gan/hospital_4/experiment_registration2/8.2.out/NCCT/439856_first_BS_NCCT.nii.gz', '../../data/gan/hospital_4/experiment_registration2/10.predict')
     # predict('../../data/gan/hospital_6/experiment_registration2/8.2.out/NCCT/4692992_first_BS_NCCT.nii.gz', '../../data/gan/hospital_6/experiment_registration2/10.predict')
-    batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.6.out', '../../data/gan/hospital_4/experiment_registration2/8.6.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
-    batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.6.out', '../../data/gan/hospital_4/experiment_registration2/8.6.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
-    batch_convert_niigz_jpg('../../data/gan/hospital_4/experiment_registration2/10.predict', '../../data/gan/hospital_4/experiment_registration2/10.predict_jpg')
+
+
+    # batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.6.out', '../../data/gan/hospital_4/experiment_registration2/8.6.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
+    # batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.6.out', '../../data/gan/hospital_4/experiment_registration2/8.6.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
+    # batch_convert_niigz_jpg('../../data/gan/hospital_4/experiment_registration2/10.predict', '../../data/gan/hospital_4/experiment_registration2/10.predict_jpg')
+
+    batch_predict_cta('../../data/gan/hospital_4_2/experiment_registration2/8.2.out', '../../data/gan/hospital_4_2/experiment_registration2/8.2.out/config/positive_mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4_2/experiment_registration2/10.predict')
+    batch_convert_niigz_jpg('../../data/gan/hospital_4_2/experiment_registration2/10.predict', '../../data/gan/hospital_4_2/experiment_registration2/10.predict_jpg')

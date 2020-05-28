@@ -333,8 +333,8 @@ class NCCT_GAN_MASK_DS(Dataset):
 
 
 
-class NCCT_GAN_MASK_DS(Dataset):
-    def __init__(self, root_dir, config_file, phase, crop_size, scale_size, debug=False):
+class NCCT_GAN_MASK_INFARCT_DS(Dataset):
+    def __init__(self, root_dir, config_file, config_file2, phase, crop_size, scale_size, debug=False):
         super().__init__()
         self.src_list = []
         self.dst_list = []
@@ -351,6 +351,33 @@ class NCCT_GAN_MASK_DS(Dataset):
         # 配准有问题
         # hospital_4_2: '417357', '458192'， '429884':中间有断层？, '456831', '175928'疑似, 
         # hospital_4: '462630'
+
+
+        # 记录
+        self.flag_index_infarct = 1
+        self.flag_index_penumbra = 2
+        self.pos_images_list = []
+        self.pos_masks_list = []
+        self.neg_images_list = []
+        self.neg_masks_list = []
+        with open(config_file2, 'r') as f:
+            for line in f.readlines():
+                line = line.strip()
+                if line is None or len(line) == 0:
+                    continue
+                ss = line.split('\t')
+                if len(ss) != 3:
+                    continue
+                pid = ss[0]
+                if pid in global_ncct_error_list:
+                    continue
+                if ss[self.flag_index_infarct] == 'True' or ss[self.flag_index_penumbra] == 'True':
+                    self.pos_images_list.append(pid)
+                    self.pos_masks_list.append(pid)
+                else:
+                    self.neg_images_list.append(pid)
+                    self.neg_masks_list.append(pid)  
+
         with open(config_file, 'r') as f:
             for line in f.readlines():
                 line = line.strip()
@@ -371,6 +398,8 @@ class NCCT_GAN_MASK_DS(Dataset):
                 # 去除事先查看过的有问题的数据
                 index = os.path.basename(ss[0]).split('_')[0]
                 if index in self.error_indexs:
+                    continue
+                if index not in self.pos_images_list:
                     continue
                 d = int(ss[3])-int(ss[2])
                 h = int(ss[5])-int(ss[4])
@@ -494,9 +523,9 @@ class NCCT_GAN_MASK_DS(Dataset):
             mask_img = sitk.ReadImage(mask_file)
             mask_data = sitk.GetArrayFromImage(mask_img)
             
-            if np.random.rand() < 0.5:
+            if np.random.rand() < 0.9:
                 cropped_src, cropped_dst, cropped_mask = self.__random_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
-            elif np.random.rand() < 0.6:
+            elif np.random.rand() < 0.99:
                 cropped_src, cropped_dst, cropped_mask = self.__center_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
             else:
                 cropped_src, cropped_dst, cropped_mask = self.__random_skip_thickness_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
@@ -773,6 +802,43 @@ def test_NCCT_GAN_MASK_DS():
             print(dsts.shape)
 
 
+def test_NCCT_GAN_MASK_INFARCT_DS():
+    
+    class Options():
+        def __init__(self):
+            self.lr = 2e-4
+            self.beta1 = 0.5
+            self.gan_mode = 'lsgan'
+            self.direction = 'AtoB'
+            self.lambda_L1 = 2
+            self.epochs = 1000
+            self.num_workers = 2
+            self.batch_size = 2
+            self.pin_memory = True
+            self.display = 2
+            self.save_interval = 10
+            self.intermidiate_result_root = '../data/gan/hospital_4_2/experiment_registration2/8.2.out/train_result/intermidiate_result_{}'.format(__file__.split('.')[0])
+            # add patch discriminator
+            self.patch_D = False
+            self.num_patches_D = 5
+            self.patch_size_D = [64, 64, 64]
+            # crop_size
+            self.crop_size = [32, 448, 448]
+
+            self.root_dir = '../data/gan/hospital_4_2/experiment_registration2/8.2.out'
+            self.config_file = '../data/gan/hospital_4_2/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt'
+            self.config_file2 = '../data/gan/hospital_4_2/1.rapid/config.txt'
+            self.check_point = None
+
+    opt = Options()
+    ds = NCCT_GAN_MASK_INFARCT_DS(opt.root_dir, opt.config_file, opt.config_file2, 'train', opt.crop_size, opt.crop_size, debug=False)
+    data_loader = DataLoader(ds, num_workers=opt.num_workers, batch_size=opt.batch_size, pin_memory=True, shuffle=True)
+
+    for _ in range(100):
+        for i, (srcs, dsts, masks, _, _) in tqdm(enumerate(data_loader)):
+            print(srcs.shape)
+            print(dsts.shape)
+
 def test_NCCT_GAN_MASK_DS_X():
     
     class Options():
@@ -829,5 +895,6 @@ def test_NCCT_GAN_PREDICT_UTILS():
     print('finish test_NCCT_GAN_PREDICT_UTILS!')
 
 if __name__ == '__main__':
-    test_NCCT_GAN_MASK_DS()
+    # test_NCCT_GAN_MASK_DS()
     # test_NCCT_GAN_PREDICT_UTILS()
+    test_NCCT_GAN_MASK_INFARCT_DS()
