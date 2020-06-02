@@ -14,3 +14,15 @@
 ## 超分辨率
 1. [Enhanced Super-Resolution Generative Adversarial Networks](https://arxiv.org/abs/1809.00219):371
 2. []()
+
+
+## resnet
+1. [解读Squeeze-and-Excitation Networks（SENet）](https://zhuanlan.zhihu.com/p/32702350)
+2. [ResNeXt详解](https://zhuanlan.zhihu.com/p/51075096)
+3. [后ResNet时代：SENet与SKNet](https://zhuanlan.zhihu.com/p/60187262)
+4. [SKNet——SENet孪生兄弟篇](https://zhuanlan.zhihu.com/p/59690223)
+5. [轻量级模块SENet与SKNet详解](https://blog.csdn.net/qixutuo6087/article/details/88822428)
+6. [ResNet最强改进版来了！ResNeSt：Split-Attention Networks](https://zhuanlan.zhihu.com/p/132655457)
+7. [关于ResNeSt的点滴疑惑](https://zhuanlan.zhihu.com/p/133805433)
+8. [ResNeSt: Split-Attention Network](https://github.com/zhanghang1989/ResNeSt)
+9. [End-to-End Object Detection with Transformers](https://128.84.21.199/pdf/2005.12872.pdf)

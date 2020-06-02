@@ -14,7 +14,8 @@ from tqdm import tqdm
 
 
 global_ncct_error_list = ['250238', '317892', '462086', '456640', '475170', '372829', '462630', '417357', '458192', '429884', '456831', 
-    '5016897', '3466686', '3772244', '3839904', '4728962']
+    '5016897', '3466686', '3772244', '3839904', '4728962', 
+    '149120', '299553', '371220', '372829', '445315', '458192', '152937', '163778', '447230', '447614', '454263', '448828', '453305', '458299']
 
 
 
@@ -371,7 +372,8 @@ class NCCT_GAN_MASK_INFARCT_DS(Dataset):
                 pid = ss[0]
                 if pid in global_ncct_error_list:
                     continue
-                if ss[self.flag_index_infarct] == 'True' or ss[self.flag_index_penumbra] == 'True':
+                # if ss[self.flag_index_infarct] == 'True' or ss[self.flag_index_penumbra] == 'True':
+                if ss[self.flag_index_infarct] == 'True':
                     self.pos_images_list.append(pid)
                     self.pos_masks_list.append(pid)
                 else:

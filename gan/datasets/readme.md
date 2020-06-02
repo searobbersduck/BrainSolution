@@ -74,7 +74,7 @@
 ---
 ---
 思路：先提取出cta图像的脑实质部分，分别做cta和dwi图像在脑实质部分的mask
-- [ ] 提取脑实质部分的mask
+- [x] 提取脑实质部分的mask
     * 调用命令`python cta_to_dwi_dataset.py generate_cerebral_parenchyma ../data/gan/cta2dwi/experiment_data1/rigid_registration/cerebral_parenchyma ../data/gan/cta2dwi/experiment_data1/rigid_registration_mask/cerebral_parenchyma *_brain_rigid_aligned.nii.gz`
     * 暂时无用，对于脑实质靠下的部分，脑实质区域较小，会影响判断
 
@@ -123,3 +123,5 @@
 
 - [ ] 根据脑实质的mask，将相应的CTA和DWI部分截取出来
     * 提取CTA，调用命令：`python cta_to_dwi_dataset.py extract_region_by_mask ../data/gan/cta2dwi/experiment_data1/rigid_registration_skull_stripper/cerebral_parenchyma ../data/gan/cta2dwi/experiment_data1/rigid_registration_rescale/CTA ../data/gan/cta2dwi/experiment_data1/rigid_registration_skull_stripper/CTA *brain*.nii.gz *CTA*.nii.gz`
+
+

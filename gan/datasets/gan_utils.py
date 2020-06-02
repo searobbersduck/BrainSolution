@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-28 10:11:26
+@LastEditTime: 2020-06-02 17:27:12
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -1608,6 +1608,82 @@ def ncct_generate_cerebral_parenchyma_middle_layer_multiprocess(indir, outdir, i
     pool.join()        
 
 
+# 找出脑实质的最大层，并在最大层的上下各取60层（假设层厚为0.5mm），每层保留只有脑实质的部分
+def ncct_generate_cerebral_parenchyma_middle_layer_only_onecase(infile, outfile):
+    '''
+    ncct_generate_cerebral_parenchyma_middle_layer_only_onecase('../data/gan/hospital_4/experiment_registration2/5 dwi_rigid_align_ncct/406862_first_BS_brain.nii.gz', None)
+    '''
+    in_img = sitk.ReadImage(infile)
+    
+    in_arr = sitk.GetArrayFromImage(in_img)
+    out_arr = np.zeros(in_arr.shape, dtype=in_arr.dtype)
+    # 范围限定在(5, in_arr.shape[0]-5)，因为配准时脑实质图像的上下边缘生成有问题
+    for z in range(5, in_arr.shape[0]-5):
+        tmp_arr = in_arr[z]
+        out_arr[z,tmp_arr>0] = 1
+
+    # dilation
+    tmp_img = sitk.GetImageFromArray(out_arr)
+    tmp_img = sitk.Cast(tmp_img, sitk.sitkInt16)
+    dilation_filter = sitk.BinaryDilateImageFilter()
+    dilation_filter.SetForegroundValue(1)
+    dilation_filter.SetBackgroundValue(0)
+    dilation_filter.SetKernelRadius(3)
+    tmp_img = dilation_filter.Execute(tmp_img)
+    out_arr = sitk.GetArrayFromImage(tmp_img)
+    
+    # 在保留的断层中，mask区域扩大到和最大层面面积相等
+    max_region = np.max(out_arr, axis=0)
+    layers = np.sum(out_arr, axis=(1,2))
+    max_layer_index = np.argmax(layers)
+
+    layer_delta = 64
+    valid_range = list(range(max(0, max_layer_index-layer_delta), max_layer_index+layer_delta))
+
+    for z in range(in_arr.shape[0]):
+        if (z not in valid_range) or (layers[z]/max(layers) < 0.5):
+            out_arr[z,:,:] = 0
+        else:
+            pass
+
+    out_img = sitk.GetImageFromArray(out_arr)
+    out_img.CopyInformation(in_img)
+    out_file = outfile
+    os.makedirs(os.path.dirname(out_file), exist_ok=True)
+    writer = sitk.ImageFileWriter()
+    writer.SetFileName(out_file)
+    writer.Execute(out_img)
+
+def ncct_generate_cerebral_parenchyma_middle_layer_only_singletask(infiles, outdir):
+    os.makedirs(outdir, exist_ok=True)
+    for infile in tqdm(infiles):
+        outfile = os.path.join(outdir, os.path.basename(infile))
+        ncct_generate_cerebral_parenchyma_middle_layer_only_onecase(infile, outfile)
+
+def ncct_generate_cerebral_parenchyma_middle_layer_only_multiprocess(indir, outdir, inpattern, process_num=12):
+    
+    import multiprocessing
+    from multiprocessing import Process
+    multiprocessing.freeze_support()
+
+    pool = multiprocessing.Pool()
+    results = []
+    
+    os.makedirs(outdir, exist_ok=True)
+    infiles = glob(os.path.join(indir, inpattern))
+    
+    num_per_process = (len(infiles) + process_num - 1)//process_num
+
+    for i in range(process_num):
+        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
+        print(sub_infiles)
+        result = pool.apply_async(ncct_generate_cerebral_parenchyma_middle_layer_only_singletask, args=(sub_infiles, outdir))
+        results.append(result)
+
+    pool.close()
+    pool.join()   
+
+
 def utils_get_folder_pattern(indir, initpattern):
     files = glob(os.path.join(indir, initpattern))
     pattern = os.path.basename(files[0])
@@ -1688,9 +1764,14 @@ def ncct_genereate_cta2dwi_config_file_with_cerebral_parenchyma(indir, configdir
     for i in tqdm(range(len(brain_files))):
         brain_img = sitk.ReadImage(brain_files[i])
         brain_arr = sitk.GetArrayFromImage(brain_img)
-        ranges = np.where(brain_arr > 0)
-        [z_min, y_min, x_min] = np.min(np.array(ranges), axis=1)
-        [z_max, y_max, x_max] = np.max(np.array(ranges), axis=1)
+        # ranges = np.where(brain_arr > 0)
+        # [z_min, y_min, x_min] = np.min(np.array(ranges), axis=1)
+        # [z_max, y_max, x_max] = np.max(np.array(ranges), axis=1)
+        [z_min, y_min, x_min] = [0,0,0]
+        [z_max, y_max, x_max] = brain_arr.shape
+        z_max -= 1
+        y_max -= 1
+        x_max -= 1
         # ncct / dwi_b0 / dwi_bxxx / adc
         info = '{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
             _helper_get_file_name(ncct_files[i]),_helper_get_file_name(dwi_b0_files[i]),
@@ -1773,7 +1854,7 @@ def ncct_genereate_cta2dwi_config_file_with_cerebral_parenchyma(indir, configdir
 def ncct_split_train_test_according_to_rapid_result(train_config_file, test_config_file, rapid_config_file):
     '''
     debug cmd: ncct_split_train_test_according_to_rapid_result('../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../data/gan/hospital_4/experiment_registration3/1.rapid/config.txt')
-    invoke cmd: s
+    invoke cmd: 
     '''
     infarct_pids = []
     penumbra_pids = []
@@ -1797,7 +1878,8 @@ def ncct_split_train_test_according_to_rapid_result(train_config_file, test_conf
                 return pid
         return None
 
-    test_pids = positive_pids
+    # test_pids = positive_pids
+    test_pids = infarct_pids
 
     positive_list = []
 
@@ -2295,7 +2377,7 @@ def rapid_extract_summary_info_dcm0_core_infarct_area(dcm_file, adc_image, patie
             dwi_arr[iz,:,:, :] = arr[0, ih*single_h:(ih+1)*single_h, iw*single_w:(iw+1)*single_w, :]
             # dwi_arr[iz,:,:, :] = arr[0, 256:512, 256:512, :]
     if background_cnt > 0:
-        print('{}\tbackground:\t{}'.format(dcm_file, background_cnt))
+        # print('{}\tbackground:\t{}'.format(dcm_file, background_cnt))
         return False, background_cnt
     # dwi_img = sitk.GetImageFromArray(dwi_arr)
     # dwi_img.SetOrigin(adc_info.origin)
@@ -2326,8 +2408,14 @@ def rapid_extract_summary_info_dcm0_core_infarct_area(dcm_file, adc_image, patie
 
     #检查是否存在核心梗死区
     infarct_area = np.sum(infarct_mask_arr)
+    infarct_spc = infarct_mask_img.GetSpacing()
+    infarct_size = infarct_mask_img.GetSize()
+    infarct_volume = infarct_area * infarct_spc[0] * infarct_spc[1] * infarct_spc[2] * infarct_size[0] * infarct_size[1]/(256*256)
+    # print('{} infarct volume:\t{}\t{:1d}ml'.format(dcm_file, patient_id, int(infarct_volume/1000)))
+    print('infarct volume:\t{}\t{:1d}ml'.format(patient_id, int(infarct_volume/1000)))
     if infarct_area > 5:
         # print('{} infarct area:\t{}'.format(dcm_file, infarct_area))
+        # print('{} infarct volume:\t{:1f}'.format(dcm_file, infarct_area))
         return True, None
     else:
         return False, None
@@ -2371,7 +2459,7 @@ def rapid_extract_summary_info_dcm0_ischemic_penumbra(dcm_file, adc_image, patie
             # dwi_arr[iz,:,:, :] = arr[0, 256:512, 256:512, :]
     # print('background:\t{}'.format(background_cnt))
     if background_cnt > 0:
-        print('{}\tbackground:\t{}'.format(dcm_file, background_cnt))
+        # print('{}\tbackground:\t{}'.format(dcm_file, background_cnt))
         return False, background_cnt
     # dwi_img = sitk.GetImageFromArray(dwi_arr)
     # dwi_img.SetOrigin(adc_info.origin)
@@ -2462,7 +2550,7 @@ def rapid_extract_summary_info_dcm0_ischemic_penumbra(dcm_file, adc_image, patie
 def rapid_extract_sumary_info(rapid_series_path, adc_path, patient_id, outdir):
     '''
     rapid_series_path: '../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316'
-    debug: rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316')
+    debug: rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316', '../data/gan/hospital_4/0.raw_dcm/114093/ADC/1.3.12.2.1107.5.2.30.26961.2018082614324377426400913.0.0.0', '114093', '../data/gan/hospital_4/tmp')
 
 
     return val:
@@ -2715,7 +2803,7 @@ if __name__ =='__main__':
     # cta_extract_infos_from_xlsx('../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
     ## 调试：文件下有大量的CTA和DWI序列，将这些散乱的数据一一配对
     # cta_extract_series_to_patient('../data/gan/hospital_6/ori', '../data/gan/hospital_6/0.raw_dcm', '../data/gan/hospital_6/2 排除约40人后新增32人基于原六院CTA2DWI.xlsx')
-    # rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316')
+    # rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm/114093/RAPID/1.3.6.1.4.1.39822.1.3.8323328.7953.1535266088.657316', '../data/gan/hospital_4/0.raw_dcm/114093/ADC/1.3.12.2.1107.5.2.30.26961.2018082614324377426400913.0.0.0', '114093', '../data/gan/hospital_4/tmp')
     # test_rapid_extract_sumary_info('../data/gan/hospital_4/0.raw_dcm', '../data/gan/hospital_4/1.rapid')
     # extract_cerebral_parenchyma_onecase('../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity/4495700_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/tmp')
     # ncct_set_origal_point_single('../data/gan/hospital_6/experiment_registration2/1.nii_file/3833955_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori/3833955_first_BS_NCCT.nii.gz')
@@ -2725,4 +2813,5 @@ if __name__ =='__main__':
     ## 调试将DWI的b0和b1000数据区分开
     # cta_extract_dwi_from_raw_dwi_single('../data/gan/hospital_6/0.raw_dcm/3926192/DWI/1.3.46.670589.11.17277.5.0.5008.2017041707551310621/not_dwi', None)
     # rapid_stat_dwi_positive_count_according_to_config('../data/gan/hospital_4_2/1.rapid/config.txt')
-    # ncct_split_train_test_according_to_rapid_result('../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../data/gan/hospital_4/experiment_registration3/1.rapid/config.txt')
+    # ncct_split_train_test_according_to_rapid_result('../data/gan/hospital_4_2/experiment_registration2/8.8.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_4_2/experiment_registration2/8.8.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../data/gan/hospital_4_2/experiment_registration3/1.rapid/config.txt')
+    # ncct_generate_cerebral_parenchyma_middle_layer_only_onecase('../data/gan/hospital_4_2/experiment_registration2/5 dwi_rigid_align_ncct/486499_first_BS_brain.nii.gz', None)

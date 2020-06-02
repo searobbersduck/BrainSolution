@@ -18,6 +18,7 @@ import fire
 import sys
 print(__file__)
 sys.path.append(os.path.join(os.path.dirname(__file__), os.path.pardir))
+sys.path.append(os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir))
 
 from cerebral_parenchyma.datasets.cerebral_parenchyma_extract_dataset import CerebralParenchymaSegmentDS
 
@@ -287,6 +288,16 @@ def get_maximal_connected_region(sitk_mask):
 
     return sitk_maximal_region
 
+
+def fill_hole(in_mask):
+    filter = sitk.VotingBinaryHoleFillingImageFilter()
+    filter.SetBackgroundValue(0)
+    filter.SetForegroundValue(1)
+    filter.SetRadius(8)
+    out_mask = filter.Execute(in_mask)
+    return out_mask
+
+
 def inference(infile, model_pth, outfile, mask_file=None, is_dcm=False, mask_thres=0.5):
     '''
     cmd: inference('../data/cta/image/dicom/1.3.12.2.1107.5.1.4.60320.30000012022300460003100013565', '../data/cta/predict/1.3.12.2.1107.5.1.4.60320.30000012022300460003100013565.nii.gz', './model/extract_cerebral_parenchyma/extract_cerebral_parenchyma_0000_best_loss_0.017.pth', mask_file='../data/cta/mask/Ori_nii/1.3.12.2.1107.5.1.4.60320.30000012022300460003100013565.nii.gz', is_dcm=True, mask_thres=0.5)
@@ -328,6 +339,7 @@ def inference(infile, model_pth, outfile, mask_file=None, is_dcm=False, mask_thr
     sitk_mask = sitk.GetImageFromArray(out_mask3d)
     sitk_mask.CopyInformation(image)
     sitk_mask = get_maximal_connected_region(sitk_mask)
+    sitk_mask = fill_hole(sitk_mask)
     if outfile is not None:
         os.makedirs(os.path.dirname(outfile), exist_ok=True)
         writer = sitk.ImageFileWriter()
@@ -381,6 +393,7 @@ def extract_region_by_mask1(image, mask, default_value=-1024, out_image_file=Non
         writerfilter.Execute(out_img)
 
     return out_img
+
 
 
 if __name__ == '__main__':

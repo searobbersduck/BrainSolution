@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-03-27 17:01:15
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-26 14:39:21
+@LastEditTime: 2020-06-01 15:08:34
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -656,6 +656,7 @@ def extract_region_by_mask_cut_onecase(mask_file, src_file, outfile):
     sitk.WriteImage(out_img, outfile)
 
 
+
 def extract_region_by_mask_cut_singletask(mask_files, srcdir, outdir, maskpattern, srcpattern):
     src_pattern = glob(os.path.join(srcdir, srcpattern))[0]
     src_pattern = os.path.basename(src_pattern)
@@ -693,6 +694,83 @@ def extract_region_by_mask_cut_multiprocess(maskdir, srcdir, outdir, maskpattern
         sub_infiles = mask_files[num_per_process*i:min(num_per_process*(i+1), len(mask_files))]
         print(sub_infiles)
         result = pool.apply_async(extract_region_by_mask_cut_singletask, args=(sub_infiles,srcdir, outdir, maskpattern, srcpattern))
+        results.append(result)
+
+    pool.close()
+    pool.join()
+
+
+
+def extract_region_by_mask_cut_only_onecase(mask_file, src_file, outfile):
+    '''
+    debug cmd: extract_region_by_mask_cut_onecase('../data/gan/hospital_6/experiment_registration2/8.1.out/cerebral_parenchyma/1014186_first_BS_brain.nii.gz', '../data/gan/hospital_6/experiment_registration2/5 dwi_rigid_align_ncct/1014186_first_BS_NCCT.nii.gz', None)
+    '''
+    mask_img = sitk.ReadImage(mask_file)
+    mask_arr = sitk.GetArrayFromImage(mask_img)
+
+    mask_z_sum = np.sum(np.sum(mask_arr, axis=-1), axis=-1)
+
+    ranges = np.where(mask_z_sum > 0)
+    [z_min] = np.min(np.array(ranges), axis=1)
+    [z_max] = np.max(np.array(ranges), axis=1)
+
+
+    src_img = sitk.ReadImage(src_file)
+    maskfilter = sitk.MaskImageFilter()
+    maskfilter.SetOutsideValue(-1024)
+    src_img = sitk.Cast(src_img, sitk.sitkInt16)
+    mask_img = sitk.Cast(mask_img, sitk.sitkInt16)
+    src_img = maskfilter.Execute(src_img, mask_img)
+    src_arr = sitk.GetArrayFromImage(src_img)
+    out_arr = src_arr[z_min:z_max+1, :, :]
+    
+    out_img = sitk.GetImageFromArray(out_arr)
+    
+    print(outfile)
+    sitk.WriteImage(out_img, outfile)
+
+
+
+def extract_region_by_mask_cut_only_singletask(mask_files, srcdir, outdir, maskpattern, srcpattern):
+    src_pattern = glob(os.path.join(srcdir, srcpattern))[0]
+    src_pattern = os.path.basename(src_pattern)
+    src_pattern = src_pattern.replace(src_pattern.split('_')[0], '')
+    
+    for mask_file in tqdm(mask_files):
+        if not os.path.isfile(mask_file):
+            continue
+        index = os.path.basename(mask_file).split('_')[0]
+        src_file = os.path.join(srcdir, '{}{}'.format(index, src_pattern))
+        if not os.path.isfile(src_file):
+            continue
+        outfile = os.path.join(outdir, os.path.basename(src_file))
+        try:
+            extract_region_by_mask_cut_only_onecase(mask_file, src_file, outfile)
+        except Exception as e:
+            print('{}:\t{}'.format(index, e))
+
+
+def extract_region_by_mask_cut_only_multiprocess(maskdir, srcdir, outdir, maskpattern, srcpattern,  process_num=8):
+    '''
+    python cta_to_dwi_dataset.py extract_region_by_mask_cut_only_multiprocess '../data/gan/hospital_6/experiment_registration2/8.1.out/cerebral_parenchyma' '../data/gan/hospital_6/experiment_registration2/5 dwi_rigid_align_ncct' '../data/gan/hospital_6/experiment_registration2/8.2.out/NCCT' *brain*.nii.gz *NCCT.nii.gz
+    '''
+    os.makedirs(outdir, exist_ok=True)
+
+    import multiprocessing
+    from multiprocessing import Process
+    multiprocessing.freeze_support()
+
+    pool = multiprocessing.Pool()
+    results = []
+
+    mask_files = glob(os.path.join(maskdir, maskpattern))
+
+    num_per_process = (len(mask_files) + process_num - 1)//process_num
+
+    for i in range(process_num):
+        sub_infiles = mask_files[num_per_process*i:min(num_per_process*(i+1), len(mask_files))]
+        print(sub_infiles)
+        result = pool.apply_async(extract_region_by_mask_cut_only_singletask, args=(sub_infiles,srcdir, outdir, maskpattern, srcpattern))
         results.append(result)
 
     pool.close()

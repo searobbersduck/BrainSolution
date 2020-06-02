@@ -43,6 +43,7 @@ class Options():
         self.config_file2 = '../../data/gan/hospital_4_2/1.rapid/config.txt'
         self.check_point = None
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200526_x/pixel2pixel_netG_epoch_75_loss_14.7070.pth'
+        self.netD_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200526_x/pixel2pixel_netG_epoch_975_loss_5.9942.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
         # self.netG_model_path = None
         self.netD_model_path = None
