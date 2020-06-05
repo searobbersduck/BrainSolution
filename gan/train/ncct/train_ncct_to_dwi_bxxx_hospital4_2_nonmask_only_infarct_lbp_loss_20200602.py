@@ -21,9 +21,9 @@ class Options():
         self.gan_mode = 'lsgan'
         self.direction = 'AtoB'
         self.lambda_L1 = 2
-        self.epochs = 1000
+        self.epochs = 10000
         self.num_workers = 8
-        self.batch_size = 2
+        self.batch_size = 4
         self.pin_memory = True
         self.display = 2
         self.save_interval = 10
@@ -45,6 +45,7 @@ class Options():
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200526/pixel2pixel_netG_epoch_200_loss_8.7325.pth'
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_20200529/pixel2pixel_netG_epoch_975_loss_4.2853.pth'
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_25_loss_10.1183.pth'
+        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_lbp_loss_20200602/pixel2pixel_netG_epoch_925_loss_16.2750.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
         # self.netG_model_path = None
         self.netD_model_path = None

@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-06-02 17:27:12
+@LastEditTime: 2020-06-03 09:31:34
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -521,7 +521,7 @@ def ncct_extract_infos_from_patients_all(in_dir, out_dir):
     all_select_infos = []
     for patient_id in os.listdir(in_dir):
         patient_path = os.path.join(in_dir, patient_id)
-        infos, select_infos = ncct_extract_info_from_patient(patient_path)
+        infos, select_infos = ncct_extract_info_from_patient(patient_path, 259200)
         # if len(infos['DWI']) > 1 and len(infos['ADC']) > 0 and len(infos['NCCT']) > 0:
         #     print(infos)
         # if len(infos['NCCT']) == 2:
@@ -558,30 +558,30 @@ def ncct_extract_infos_from_patients_all(in_dir, out_dir):
     for select_info in tqdm(all_select_infos):
         patient_uid = select_info['PID']
 
-    #     if len(select_info['DWI']) > 0:
-    #         src_series = os.path.join(in_dir, patient_uid, select_info['DWI'][0]['series_uid'])
-    #         dst_series = os.path.join(out_dir, patient_uid, 'DWI', select_info['DWI'][0]['series_uid'])
-    #         os.makedirs(os.path.dirname(dst_series), exist_ok=True)
-    #         ncct_extract_dwi_from_raw_dwi_single(src_series, dst_series)
-    #         # shutil.copytree(src_series, dst_series)
+        if len(select_info['DWI']) > 0:
+            src_series = os.path.join(in_dir, patient_uid, select_info['DWI'][0]['series_uid'])
+            dst_series = os.path.join(out_dir, patient_uid, 'DWI', select_info['DWI'][0]['series_uid'])
+            os.makedirs(os.path.dirname(dst_series), exist_ok=True)
+            ncct_extract_dwi_from_raw_dwi_single(src_series, dst_series)
+            # shutil.copytree(src_series, dst_series)
 
-    #     if len(select_info['ADC']) > 0:
-    #         src_series = os.path.join(in_dir, patient_uid, select_info['ADC'][0]['series_uid'])
-    #         dst_series = os.path.join(out_dir, patient_uid, 'ADC', select_info['ADC'][0]['series_uid'])
-    #         os.makedirs(os.path.dirname(dst_series), exist_ok=True)
-    #         shutil.copytree(src_series, dst_series)
+        if len(select_info['ADC']) > 0:
+            src_series = os.path.join(in_dir, patient_uid, select_info['ADC'][0]['series_uid'])
+            dst_series = os.path.join(out_dir, patient_uid, 'ADC', select_info['ADC'][0]['series_uid'])
+            os.makedirs(os.path.dirname(dst_series), exist_ok=True)
+            shutil.copytree(src_series, dst_series)
 
-    #     if len(select_info['NCCT']) > 0:
-    #         src_series = os.path.join(in_dir, patient_uid, select_info['NCCT'][0]['series_uid'])
-    #         dst_series = os.path.join(out_dir, patient_uid, 'NCCT', select_info['NCCT'][0]['series_uid'])
-    #         os.makedirs(os.path.dirname(dst_series), exist_ok=True)
-    #         shutil.copytree(src_series, dst_series)
+        if len(select_info['NCCT']) > 0:
+            src_series = os.path.join(in_dir, patient_uid, select_info['NCCT'][0]['series_uid'])
+            dst_series = os.path.join(out_dir, patient_uid, 'NCCT', select_info['NCCT'][0]['series_uid'])
+            os.makedirs(os.path.dirname(dst_series), exist_ok=True)
+            shutil.copytree(src_series, dst_series)
 
-    #     if len(select_info['RAPID']) > 0:
-    #         src_series = os.path.join(in_dir, patient_uid, select_info['RAPID']['series_uid'])
-    #         dst_series = os.path.join(out_dir, patient_uid, 'RAPID', select_info['RAPID']['series_uid'])
-    #         os.makedirs(os.path.dirname(dst_series), exist_ok=True)
-    #         shutil.copytree(src_series, dst_series)
+        if len(select_info['RAPID']) > 0:
+            src_series = os.path.join(in_dir, patient_uid, select_info['RAPID']['series_uid'])
+            dst_series = os.path.join(out_dir, patient_uid, 'RAPID', select_info['RAPID']['series_uid'])
+            os.makedirs(os.path.dirname(dst_series), exist_ok=True)
+            shutil.copytree(src_series, dst_series)
 
         if len(select_info['MRP']) > 0:
             src_series = os.path.join(in_dir, patient_uid, select_info['MRP']['series_uid'])

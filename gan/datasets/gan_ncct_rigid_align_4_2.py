@@ -179,7 +179,7 @@ def multiprocess_main():
 
     # base_dir = r'/ssd2/zhangwd/data/brain/gan/ncct2dwi/experiment_registration2/'
     # base_dir = r'/ssd2/zhangwd/data/brain/gan/hospital_4/experiment_registration2/'
-    base_dir = r'/ssd2/zhangwd/data/brain/gan/hospital_4_2/experiment_registration2/'
+    base_dir = r'/ssd2/zhangwd/data/brain/gan/hospital_4_2_3d/experiment_registration2/'
     input_dir = base_dir + r'4 Patient_nii_unity'
     output_dir = base_dir + r'5 dwi_rigid_align_ncct'
     ref_file_flag1 = r'BS_brain.nii.gz'
