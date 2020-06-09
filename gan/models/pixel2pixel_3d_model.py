@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-03-30 15:44:31
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-05-19 11:00:52
+@LastEditTime: 2020-06-08 15:51:21
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -301,6 +301,8 @@ class Pix2PixModel():
     def forward(self):
         self.netG = torch.nn.DataParallel(self.netG_cpu).cuda()
         self.netD = torch.nn.DataParallel(self.netD_cpu).cuda()
+        # self.netG.train()
+        # self.netD.train()
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
         self.fake_B = self.netG(self.real_A)  # G(A)
 

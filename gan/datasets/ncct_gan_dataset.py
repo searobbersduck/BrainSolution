@@ -15,7 +15,8 @@ from tqdm import tqdm
 
 global_ncct_error_list = ['250238', '317892', '462086', '456640', '475170', '372829', '462630', '417357', '458192', '429884', '456831', 
     '5016897', '3466686', '3772244', '3839904', '4728962', 
-    '149120', '299553', '371220', '372829', '445315', '458192', '152937', '163778', '447230', '447614', '454263', '448828', '453305', '458299']
+    '149120', '299553', '371220', '372829', '445315', '458192', '152937', '163778', '447230', '447614', '454263', '448828', '453305', '458299', 
+    '406601', '437235', '445315', '447614', '448828', '456640', '163778', '393774']
 
 
 
@@ -525,9 +526,9 @@ class NCCT_GAN_MASK_INFARCT_DS(Dataset):
             mask_img = sitk.ReadImage(mask_file)
             mask_data = sitk.GetArrayFromImage(mask_img)
             
-            if np.random.rand() < 0.8:
+            if np.random.rand() < 0.9:
                 cropped_src, cropped_dst, cropped_mask = self.__random_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
-            elif np.random.rand() < 0.85:
+            elif np.random.rand() < 0.99:
                 cropped_src, cropped_dst, cropped_mask = self.__center_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])
             else:
                 cropped_src, cropped_dst, cropped_mask = self.__random_skip_thickness_crop_data(src_data, dst_data, mask_data, self.crop_size, self.boundary_list[idx])

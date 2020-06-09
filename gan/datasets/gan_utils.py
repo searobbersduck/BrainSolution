@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-06-03 09:31:34
+@LastEditTime: 2020-06-09 09:30:39
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -887,7 +887,7 @@ def ncct_convert_dcm_to_niigz_onecase(indir, patient_ids, outdir, include_adc=Tr
         out_b0_file = os.path.join(outdir, '{}_first_FU_DWI_B0.nii.gz'.format(index))
         out_bxxx_file = os.path.join(outdir, '{}_first_FU_DWI_BXXX.nii.gz'.format(index))
         # 将ncct的转换放在此处，是为了保证ncct和dwi同时存在或不存在
-        ncct_convert_dcm_to_niigz_single(ncct_path, out_ncct_file, False)
+        ncct_convert_dcm_to_niigz_single(ncct_path, out_ncct_file, True)
         ncct_convert_dcm_to_niigz_single(b0_path, out_b0_file)
         ncct_convert_dcm_to_niigz_single(bxxx_path, out_bxxx_file)
 
@@ -2712,6 +2712,52 @@ def change_names_batch(indir, outdir, inpattern, outpattern):
         os.rename(infile, outfile)
 
 
+def copy_infarct_data(indir, outdir, config_file):
+    '''
+    indir: ../data/gan/hospital_6_crop/experiment_registration2/8.2.out
+    tree -L 1
+    .
+    ├── ADC -> DWI_BXXX
+    ├── cerebral_parenchyma
+    ├── config
+    ├── DWI_B0 -> DWI_BXXX
+    ├── DWI_BX
+
+    outdir: ../data/gan/hospital_6_crop/experiment_registration2/8.2.out_infarct
+
+    debug cmd: copy_infarct_data('../data/gan/hospital_6_crop/experiment_registration2/8.2.out', '../data/gan/hospital_6_crop/experiment_registration2/8.2.out_infarct', '../data/gan/hospital_4_2_3d/1.rapid/config.txt')
+    invoke cmd: python gan_utils.py copy_infarct_data '../data/gan/hospital_6_crop/experiment_registration2/8.2.out' '../data/gan/hospital_6_crop/experiment_registration2/8.2.out_infarct' '../data/gan/hospital_4_2_3d/1.rapid/config.txt'
+    '''
+    in_ncct_dir = os.path.join(indir, 'NCCT')
+    in_dwi_bxxx_dir = os.path.join(indir, 'DWI_BXXX')
+    ncct_pattern = '_first_BS_NCCT.nii.gz'
+    dwi_bxxx_pattern = '_first_FU_DWI_BXXX.nii.gz'
+    out_ncct_dir = os.path.join(outdir, 'NCCT')
+    out_dwi_bxxx_dir = os.path.join(outdir, 'DWI_BXXX')
+    os.makedirs(out_ncct_dir, exist_ok=True)
+    os.makedirs(out_dwi_bxxx_dir, exist_ok=True)
+    with open(config_file, 'r') as f:
+            for line in f.readlines():
+                line = line.strip()
+                if line is None or len(line) == 0:
+                    continue
+                ss = line.split('\t')
+                if len(ss) != 3:
+                    continue
+                if ss[1] != 'True':
+                    continue
+                pid = ss[0]
+                src_ncct_file = os.path.join(in_ncct_dir, '{}{}'.format(pid, ncct_pattern))
+                if not os.path.isfile(src_ncct_file):
+                    continue
+                src_dwi_bxxx_file = os.path.join(in_dwi_bxxx_dir, '{}{}'.format(pid, dwi_bxxx_pattern))
+                dst_ncct_file = os.path.join(out_ncct_dir, '{}{}'.format(pid, ncct_pattern))
+                dst_dwi_bxxx_file = os.path.join(out_dwi_bxxx_dir, '{}{}'.format(pid, dwi_bxxx_pattern))
+                shutil.copyfile(src_ncct_file, dst_ncct_file)
+                shutil.copyfile(src_dwi_bxxx_file, dst_dwi_bxxx_file)
+
+
+
 # 批量将三维数据的3个截面保存
 def extract_mpr_one_case(infile, outdir, is_dcm=False):
     '''
@@ -2766,7 +2812,6 @@ def extract_mpr_multiprocess(indir, outdir, process_num=12):
     pool.close()
     pool.join()
 
-
 def test_fire(t_int, t_bool, t_str):
     print(t_int+1)
     print(t_bool)
@@ -2808,6 +2853,7 @@ if __name__ =='__main__':
     # extract_cerebral_parenchyma_onecase('../data/gan/hospital_6/experiment_registration2/4 Patient_nii_unity/4495700_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/tmp')
     # ncct_set_origal_point_single('../data/gan/hospital_6/experiment_registration2/1.nii_file/3833955_first_BS_NCCT.nii.gz', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori/3833955_first_BS_NCCT.nii.gz')
     # cta_split_train_test_according_to_xlsx('../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_6/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt')
+    # cta_split_train_test_according_to_xlsx('../data/gan/hospital_6/CTA ASPECT 总表 V11.xlsx', '../data/gan/hospital_6_crop/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_6_crop/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt')
     # rapid_check_rapid_mrp_both_exist('../data/gan/hospital_4/0.raw_dcm')
     # rapid_extract_sumary_info_multiprocess('../data/gan/hospital_4_2/0.raw_dcm', '../data/gan/hospital_4_2/1.rapid')
     ## 调试将DWI的b0和b1000数据区分开
