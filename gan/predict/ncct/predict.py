@@ -69,7 +69,8 @@ class Options():
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_75_loss_4.4811.pth'
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_125_loss_4.7230.pth'
         self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_925_loss_2.5191.pth'
-        self.netD_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_1575_loss_2.1242.pth'
+        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_1575_loss_2.1242.pth'
+        self.netG_model_path = '../../data/gan/hospital_4_2_3d/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200608/pixel2pixel_netG_epoch_5100_loss_2.8051.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
         # self.netG_model_path = None
         self.netD_model_path = None
@@ -213,8 +214,11 @@ if __name__ == '__main__':
 
     # batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.2.out', '../../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
     # batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.2.out', '../../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
-    batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.8.out', '../../data/gan/hospital_4/experiment_registration2/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
-    batch_convert_niigz_jpg('../../data/gan/hospital_4/experiment_registration2/10.predict', '../../data/gan/hospital_4/experiment_registration2/10.predict_jpg')
+    # batch_predict_cta('../../data/gan/hospital_4/experiment_registration2/8.8.out', '../../data/gan/hospital_4/experiment_registration2/8.2.out/config/positive_mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4/experiment_registration2/10.predict')
+    # batch_convert_niigz_jpg('../../data/gan/hospital_4/experiment_registration2/10.predict', '../../data/gan/hospital_4/experiment_registration2/10.predict_jpg')
 
     # batch_predict_cta('../../data/gan/hospital_4_2/experiment_registration2/8.8.out', '../../data/gan/hospital_4_2/experiment_registration2/8.8.out/config/positive_mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4_2/experiment_registration2/10.predict')
     # batch_convert_niigz_jpg('../../data/gan/hospital_4_2/experiment_registration2/10.predict', '../../data/gan/hospital_4_2/experiment_registration2/10.predict_jpg')
+
+    batch_predict_cta('../../data/gan/hospital_4_2_3d/experiment_registration2/8.8.out', '../../data/gan/hospital_4_2_3d/experiment_registration2/8.8.out/config/positive_mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_4_2_3d/experiment_registration2/10.predict')
+    batch_convert_niigz_jpg('../../data/gan/hospital_4_2_3d/experiment_registration2/10.predict', '../../data/gan/hospital_4_2_3d/experiment_registration2/10.predict_jpg')

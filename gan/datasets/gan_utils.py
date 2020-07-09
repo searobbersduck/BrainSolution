@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-06-09 09:30:39
+@LastEditTime: 2020-07-08 11:00:45
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -2812,6 +2812,215 @@ def extract_mpr_multiprocess(indir, outdir, process_num=12):
     pool.close()
     pool.join()
 
+
+# statistc 
+
+def cta_stat_lesion_volume_size(indir):
+    '''
+    统计标注好的real dwi的病灶区域的体积（单位：ml），输出路径：os.path.join(indir, stat_result_real_dwi.csv)
+    debug cmd: cta_stat_lesion_volume_size('../data/gan/hospital_6')
+    '''
+    raw_ct_dir = os.path.join(indir, '0.raw_dcm')
+    annotation_dir = os.path.join(indir, 'annotation')
+    annotation_dwi_dir = os.path.join(indir, 'annotation', 'real_dwi')
+    dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+    csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2694.csv')
+    csv_file2 = os.path.join(annotation_dir, 'Series_real DWI.xls')
+
+    # annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi')
+    # dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+    # csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2695.csv')
+    # csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+
+    # annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi_liaren_split', '5283')
+    # dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+    # csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
+    # csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+
+    # annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi_liaren_split', '5284')
+    # dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+    # csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
+    # csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+
+    df1 = pd.read_csv(csv_file1)
+    df2 = pd.read_excel(csv_file2)
+    imageid_to_patientid = {}
+    for index, row in df1.iterrows():
+        image_id = row['影像结果编号']
+        patient_id = df2[df2['序列号'] == row['序列编号']]['原始路径'].values[0]
+        patient_id = os.path.basename(patient_id).split('_')[0]
+        imageid_to_patientid[str(image_id)] = str(patient_id)
+        # if patient_id == '3901698':
+        #     print(image_id)
+    patient_ids = []
+    lesion_volumes = []
+    row_elems = []
+    for dwi_file in tqdm(dwi_files):
+        basename = os.path.basename(dwi_file)
+        patient_id = basename.split('.')[0]
+        cta_dir = os.path.join(raw_ct_dir, '{}/NCCT'.format(imageid_to_patientid[patient_id]))
+        cta_series_uid = os.listdir(cta_dir)[0]
+        cta_series_uid = os.path.join(cta_dir, cta_series_uid)
+        cta_image = read_dcm_file(cta_series_uid)
+        dwi_image = sitk.ReadImage(dwi_file)
+        dwi_arr = sitk.GetArrayFromImage(dwi_image)
+        spc = cta_image.GetSpacing()
+        # lesion_volume = int(np.sum(dwi_arr)*spc[0]*spc[0]*spc[0]/1000)
+        lesion_volume = np.round(np.sum(dwi_arr)*spc[0]*spc[0]*spc[0]/1000, 1)
+        patient_ids.append(imageid_to_patientid[patient_id])
+        lesion_volumes.append(lesion_volume)
+        row_elems.append(np.array([imageid_to_patientid[patient_id], lesion_volume]))
+        # print('{} volume is:\t{}'.format(imageid_to_patientid[patient_id], lesion_volume))
+    df = pd.DataFrame(np.array(row_elems), columns=['pid', 'real dwi volumes(ml)'])
+    df.to_csv(os.path.join(annotation_dir, 'stat_result_real_dwi.csv'))
+    # df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi.csv'))
+    # df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi_5283.csv'))
+    # df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi_5284.csv'))
+
+def cta_stat_calc_dice(gt_file, pred_file):
+    '''
+    debug cmd: cta_stat_calc_dice('../data/gan/hospital_6/annotation/anno_result/2313573.mha', '../data/gan/hospital_6/annotation/anno_result/2396943.mha')
+    '''
+    gt_img = sitk.ReadImage(gt_file)
+    pred_img = sitk.ReadImage(pred_file)
+    # print(gt_img.GetSize())
+    # print(pred_img.GetSize())
+    gt_arr = sitk.GetArrayFromImage(gt_img)
+    pred_arr = sitk.GetArrayFromImage(pred_img)
+    pred_arr = pred_arr[:gt_arr.shape[0],:,:]
+    intersect = (gt_arr*pred_arr).sum()
+    denominator = gt_arr.sum() + pred_arr.sum()
+    smooth = 1e-8
+    dice = 2 * ((intersect + smooth) / (denominator + smooth))
+    return dice
+
+def cta_stat_lesion_volume_dice(indir):
+    '''
+    debug cmd: cta_stat_lesion_volume_dice('../data/gan/hospital_6')
+    '''
+    # 找到统一patientid对应的real标注，virtual标注0，virtual标注1，virtual标注2
+    annotation_dir = os.path.join(indir, 'annotation')
+    csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2694.csv')
+    csv_file2 = os.path.join(annotation_dir, 'Series_real DWI.xls')
+    df1 = pd.read_csv(csv_file1)
+    df2 = pd.read_excel(csv_file2)
+    imageid_to_patientid = {}
+    patientid_to_image_id_real = {}
+    for index, row in df1.iterrows():
+        image_id = row['影像结果编号']
+        patient_id = df2[df2['序列号'] == row['序列编号']]['原始路径'].values[0]
+        patient_id = os.path.basename(patient_id).split('_')[0]
+        imageid_to_patientid[str(image_id)] = str(patient_id)
+        patientid_to_image_id_real[str(patient_id)] = str(image_id)
+
+    csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2695.csv')
+    csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+    df1 = pd.read_csv(csv_file1)
+    df2 = pd.read_excel(csv_file2)
+    imageid_to_patientid = {}
+    patientid_to_image_id_fake0 = {}
+    for index, row in df1.iterrows():
+        image_id = row['影像结果编号']
+        patient_id = df2[df2['序列号'] == row['序列编号']]['原始路径'].values[0]
+        patient_id = os.path.basename(patient_id).split('_')[0]
+        imageid_to_patientid[str(image_id)] = str(patient_id)
+        patientid_to_image_id_fake0[str(patient_id)] = str(image_id)    
+
+    csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
+    csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+    df1 = pd.read_csv(csv_file1)
+    df2 = pd.read_excel(csv_file2)
+    imageid_to_patientid = {}
+    patientid_to_image_id_fake1 = {}
+    patientid_to_image_id_fake2 = {}
+    for index, row in df1.iterrows():
+        image_id = row['影像结果编号']
+        patient_id = df2[df2['序列号'] == row['序列编号']]['原始路径'].values[0]
+        patient_id = os.path.basename(patient_id).split('_')[0]
+        imageid_to_patientid[str(image_id)] = str(patient_id)
+        task_id = row['用户ID']
+        if str(task_id) == '5283':
+            patientid_to_image_id_fake1[str(patient_id)] = str(image_id)  
+        if str(task_id) == '5284':
+            patientid_to_image_id_fake2[str(patient_id)] = str(image_id)  
+        
+    print(patientid_to_image_id_real)
+    print('============')
+    print(patientid_to_image_id_fake0)
+    print('============')
+    print(patientid_to_image_id_fake1)
+    print('============')
+    print(patientid_to_image_id_fake2)
+
+    print(len(patientid_to_image_id_real))
+    print(len(patientid_to_image_id_fake0))
+    print(len(patientid_to_image_id_fake1))
+    print(len(patientid_to_image_id_fake2))
+
+    anno_result_dir = os.path.join(indir, 'annotation', 'anno_result')
+    row_elems = []
+    for key, val in patientid_to_image_id_real.items():
+        try:
+            print('\n====> processing patient {}'.format(key))
+            beg = time.time()
+            gt_file = os.path.join(anno_result_dir, '{}.mha'.format(val))
+            fake0_file = os.path.join(anno_result_dir, '{}.mha'.format(patientid_to_image_id_fake0[key]))
+            fake1_file = os.path.join(anno_result_dir, '{}.mha'.format(patientid_to_image_id_fake1[key]))
+            fake2_file = os.path.join(anno_result_dir, '{}.mha'.format(patientid_to_image_id_fake2[key]))
+            dice0 = cta_stat_calc_dice(gt_file, fake0_file)
+            dice1 = cta_stat_calc_dice(gt_file, fake1_file)
+            dice2 = cta_stat_calc_dice(gt_file, fake2_file)
+            dice0 = np.round(dice0, 3)
+            dice1 = np.round(dice1, 3)
+            dice2 = np.round(dice2, 3)
+            print('patient id {} dice0 ({}/{}):\t{}'.format(key, val, patientid_to_image_id_fake0[key], dice0))
+            print('patient id {} dice1 ({}/{}):\t{}'.format(key, val, patientid_to_image_id_fake1[key], dice1))
+            print('patient id {} dice2 ({}/{}):\t{}'.format(key, val, patientid_to_image_id_fake2[key], dice2))
+            print('====> finished! time elapsed {:.3f}s'.format(time.time() - beg))
+            row_elems.append(np.array([key, dice0, dice1, dice2]))
+        except:
+            print(key)
+    
+    df = pd.DataFrame(np.array(row_elems), columns=['pid', 'dice0', 'dice1', 'dice2'])
+    df.to_csv(os.path.join(indir, 'annotation', 'stat_dicex.csv'))
+
+    # def calc_dice(gt_file, pred_file):
+    #     gt_img = sitk.ReadImage(gt_file)
+    #     pred_img = sitk.ReadImage(pred_file)
+    #     gt_arr = sitk.GetArrayFromImage(gt_img)
+    #     pred_arr = stik.GetArrayFromImage(pred_img)
+    #     intersect = gt_arr*pred_arr
+    #     denominator = (gt_arr * gt_arr).sum(-1) + (pred_arr * pred_arr).sum(-1)
+
+
+
+    
+
+# 将6院标注数据划分开
+def split_cta2dwi_anno_data(indir):
+    '''
+    debug cmd: split_cta2dwi_anno_data('../data/gan/hospital_6')
+    '''
+    annotation_dir = os.path.join(indir, 'annotation')
+    annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi_liaren')
+    csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
+    df1 = pd.read_csv(csv_file1)
+    imageid_to_taskid = {}
+    for index, row in df1.iterrows():
+        image_id = row['影像结果编号']
+        task_id = row['用户ID']
+        imageid_to_taskid[str(image_id)] = str(task_id)
+    annotation_dwi_dir2 = os.path.join(indir, 'annotation', 'fake_dwi_liaren_split')
+    for key,val in imageid_to_taskid.items():
+        tmp_dir = os.path.join(annotation_dwi_dir2, val)
+        os.makedirs(tmp_dir, exist_ok=True)
+        src_file = os.path.join(annotation_dwi_dir, '{}.mha'.format(key))
+        dst_file = os.path.join(tmp_dir, '{}.mha'.format(key))
+        shutil.copyfile(src_file, dst_file)
+        print('copy from {} to {}'.format(src_file, dst_file))
+        
+
+
 def test_fire(t_int, t_bool, t_str):
     print(t_int+1)
     print(t_bool)
@@ -2821,7 +3030,7 @@ def test_fire(t_int, t_bool, t_str):
 
 
 if __name__ =='__main__':
-    fire.Fire()
+    # fire.Fire()
     # ncct_extract_infos_from_xlsx('../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # ncct_convert_dcm_to_niigz('../data/gan/ncct2dwi/siyuan_dcm_with_pid', '../data/gan/ncct2dwi/experiment_registration1/raw', '../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # reset_dcm_info('../data/gan/ncct2dwi/siyuan_dcm_with_pid/137611/1.3.12.2.1107.5.1.4.95874.30000016121100222306600009841', '/ssd2/zhangwd/data/brain/gan/ncct2dwi/experiment_registration1/tmp/test3', True)
@@ -2861,3 +3070,7 @@ if __name__ =='__main__':
     # rapid_stat_dwi_positive_count_according_to_config('../data/gan/hospital_4_2/1.rapid/config.txt')
     # ncct_split_train_test_according_to_rapid_result('../data/gan/hospital_4_2/experiment_registration2/8.8.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../data/gan/hospital_4_2/experiment_registration2/8.8.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../data/gan/hospital_4_2/experiment_registration3/1.rapid/config.txt')
     # ncct_generate_cerebral_parenchyma_middle_layer_only_onecase('../data/gan/hospital_4_2/experiment_registration2/5 dwi_rigid_align_ncct/486499_first_BS_brain.nii.gz', None)
+    cta_stat_lesion_volume_size('../data/gan/hospital_6')
+    # split_cta2dwi_anno_data('../data/gan/hospital_6')
+    # cta_stat_lesion_volume_dice('../data/gan/hospital_6')
+    # cta_stat_calc_dice('../data/gan/hospital_6/annotation/anno_result/2313573.mha', '../data/gan/hospital_6/annotation/anno_result/2396943.mha')

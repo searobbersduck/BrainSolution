@@ -4,7 +4,7 @@ sys.path.append('../')
 sys.path.append('../../')
 import numpy as np
 
-from datasets.ncct_gan_dataset import NCCT_GAN_MASK_DS, NCCT_GAN_DS, NCCT_GAN_MASK_INFARCT_DS
+from datasets.ncct_gan_dataset import NCCT_GAN_MASK_DS, NCCT_GAN_DS
 from torch.utils.data import DataLoader, Dataset
 
 from models.pixel2pixel_3d_model import Pix2PixModel
@@ -16,20 +16,20 @@ import time
 
 class Options():
     def __init__(self):
-        self.lr = 2e-5
+        self.lr = 2e-4
         self.beta1 = 0.5
         self.gan_mode = 'lsgan'
         self.direction = 'AtoB'
         self.lambda_L1 = 2
         self.epochs = 10000
-        self.num_workers = 8
-        self.batch_size = 2
+        self.num_workers = 16
+        self.batch_size = 4
         self.pin_memory = True
         self.display = 2
         self.save_interval = 10
         self.model_save_interval = 25
-        self.intermidiate_result_root = '../../data/gan/hospital_4_2_3d/experiment_registration2/8.8.out/train_result/intermidiate_result_{}'.format(__file__.split('.')[0])
-        self.save_dir = '../../data/gan/hospital_4_2_3d/experiment_registration2/9.2.model_out/model_{}'.format(__file__.split('.')[0])
+        self.intermidiate_result_root = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out/train_result/intermidiate_result_{}'.format(__file__.split('.')[0])
+        self.save_dir = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_{}'.format(__file__.split('.')[0])
         # add patch discriminator
         self.patch_D = False
         self.num_patches_D = 5
@@ -38,26 +38,20 @@ class Options():
         self.crop_size = [32, 448, 448]
         # self.crop_size = [8, 8, 8]
 
-        self.root_dir = '../../data/gan/hospital_4_2_3d/experiment_registration2/8.8.out'
-        self.config_file = '../../data/gan/hospital_4_2_3d/experiment_registration2/8.8.out/config/positive_mask_ncct_to_dwi_bxxx_train_config_file.txt'
-        self.config_file2 = '../../data/gan/hospital_4_2_3d/1.rapid/config.txt'
+        self.root_dir = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out'
+        self.config_file = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out/config/anno_mask_ncct_to_dwi_bxxx_train_config_file.txt'
         self.check_point = None
-        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_20200526/pixel2pixel_netG_epoch_200_loss_8.7325.pth'
-        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_20200529/pixel2pixel_netG_epoch_975_loss_4.2853.pth'
-        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_175_loss_4.9606.pth'
-        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_925_loss_2.5191.pth'
-        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_6950_loss_1.4836.pth'
-        self.netG_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netG_epoch_950_loss_2.2968.pth'
+        self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_20200609/pixel2pixel_netG_epoch_1350_loss_4.6997.pth'
+        self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_lbp_loss_20200615/pixel2pixel_netG_epoch_75_loss_14.0043.pth'
+        self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_lbp_loss_20200615/pixel2pixel_netG_epoch_1750_loss_15.1692.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
         # self.netG_model_path = None
-        # self.netD_model_path = '../../data/gan/hospital_4_2/experiment_registration2/9.2.model_out/model_train_ncct_to_dwi_bxxx_hospital4_2_nonmask_only_infarct_20200601/pixel2pixel_netD_epoch_6950_loss_0.2473.pth'
         self.netD_model_path = None
 
 def train():
     opt = Options()
-    ds = NCCT_GAN_MASK_INFARCT_DS(opt.root_dir, 
+    ds = NCCT_GAN_MASK_DS(opt.root_dir, 
     opt.config_file, 
-    opt.config_file2, 
     'train', opt.crop_size, opt.crop_size, debug=False)
     dataloader = DataLoader(ds, num_workers=opt.num_workers, batch_size=opt.batch_size, pin_memory=True, shuffle=True)
 
@@ -69,6 +63,8 @@ def train():
             input['A'] = src_imgs
             input['B'] = dst_imgs
             # input['mask'] = mask_imgs
+            mask_imgs = mask_imgs.numpy()
+            input['lbp_mask'] = mask_imgs
             input['A_paths'] = 'A'
             input['B_paths'] = 'B'
 

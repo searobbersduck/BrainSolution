@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-03-27 17:01:15
 @LastEditors: searobbersanduck
-@LastEditTime: 2020-06-09 09:47:22
+@LastEditTime: 2020-06-10 09:16:35
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -717,8 +717,8 @@ def extract_region_by_mask_cut_only_onecase(mask_file, src_file, outfile):
 
     src_img = sitk.ReadImage(src_file)
     maskfilter = sitk.MaskImageFilter()
-    # maskfilter.SetOutsideValue(-1024)
-    maskfilter.SetOutsideValue(0)
+    maskfilter.SetOutsideValue(-1024)
+    # maskfilter.SetOutsideValue(0)
     src_img = sitk.Cast(src_img, sitk.sitkInt16)
     mask_img = sitk.Cast(mask_img, sitk.sitkInt16)
     src_img = maskfilter.Execute(src_img, mask_img)
