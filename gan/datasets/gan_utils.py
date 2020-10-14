@@ -3,8 +3,8 @@
 @Version: 1.0
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
-@LastEditors: searobbersanduck
-@LastEditTime: 2020-07-27 12:17:38
+LastEditors: searobbersanduck
+LastEditTime: 2020-08-21 09:30:06
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -887,7 +887,8 @@ def ncct_convert_dcm_to_niigz_onecase(indir, patient_ids, outdir, include_adc=Tr
         out_b0_file = os.path.join(outdir, '{}_first_FU_DWI_B0.nii.gz'.format(index))
         out_bxxx_file = os.path.join(outdir, '{}_first_FU_DWI_BXXX.nii.gz'.format(index))
         # 将ncct的转换放在此处，是为了保证ncct和dwi同时存在或不存在
-        ncct_convert_dcm_to_niigz_single(ncct_path, out_ncct_file, True)
+        # ncct_convert_dcm_to_niigz_single(ncct_path, out_ncct_file, True)
+        ncct_convert_dcm_to_niigz_single(ncct_path, out_ncct_file, False)
         ncct_convert_dcm_to_niigz_single(b0_path, out_b0_file)
         ncct_convert_dcm_to_niigz_single(bxxx_path, out_bxxx_file)
 
@@ -910,8 +911,10 @@ def ncct_convert_dcm_to_niigz_multiprocess(indir, outdir, process_num=24, includ
     indir = '../data/gan/ncct2dwi/experiment_registration2/0.raw_dcm'
     outdir = '../data/gan/ncct2dwi/experiment_registration2/1.nii_file'
 
-    invoke cmd: python utils.py ncct_convert_dcm_to_niigz_multiprocessing '../data/gan/ncct2dwi/experiment_registration2/0.raw_dcm' '../data/gan/ncct2dwi/experiment_registration2/1.nii_file'
-    debug cmd: ncct_convert_dcm_to_niigz_multiprocessing('../data/gan/ncct2dwi/experiment_registration2/0.raw_dcm', '../data/gan/ncct2dwi/experiment_registration2/1.nii_file')
+    invoke cmd: python utils.py ncct_convert_dcm_to_niigz_multiprocess '../data/gan/ncct2dwi/experiment_registration2/0.raw_dcm' '../data/gan/ncct2dwi/experiment_registration2/1.nii_file'
+    debug cmd: ncct_convert_dcm_to_niigz_multiprocess('../data/gan/ncct2dwi/experiment_registration2/0.raw_dcm', '../data/gan/ncct2dwi/experiment_registration2/1.nii_file')
+
+    debug cmd: (硬编码:六院的临时30例数据) ncct_convert_dcm_to_niigz_multiprocess('../data/gan/hospital_6/0.raw_dcm_neg', '../data/gan/hospital_6/experiment_registration_neg/1.nii_file_neg')
     
     '''
     os.makedirs(outdir, exist_ok=True)
@@ -1310,10 +1313,14 @@ def ncct_set_original_point(indir, outdir, original=[0,0,0], process_num=24):
 
     invoke cmd: python utils.py ncct_set_original_point '../data/gan/hospital_6/experiment_registration2/1.nii_file' '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori'
     debug cmd: ncct_set_original_point('../data/gan/hospital_6/experiment_registration2/1.nii_file', '../data/gan/hospital_6/experiment_registration2/2.nii_file_ori')
+
+    debug cmd: (硬编码:六院的临时30例数据) ncct_set_original_point('../data/gan/hospital_6/experiment_registration_neg/1.nii_file', '../data/gan/hospital_6/experiment_registration_neg/2.nii_file_ori')
     
     '''    
     os.makedirs(outdir, exist_ok=True)
     infiles = glob(os.path.join(indir, '*.nii.gz'))
+
+    # ncct_set_origal_point_singletask(infiles, outdir, original)
 
 
     import multiprocessing
@@ -1546,8 +1553,8 @@ def ncct_generate_cerebral_parenchyma_middle_layer_onecase(infile, outfile):
     for z in range(5, in_arr.shape[0]-5):
         for y in range(in_arr.shape[1]):
             x_arr = in_arr[z,y,:]
-            low_thres = 0
-            # low_thres = -1024
+            # low_thres = 0
+            low_thres = -1024
             ranges = np.where(x_arr != low_thres)
             if len(ranges[0]) > 0:
                 [x_min] = np.min(ranges, axis=1)
@@ -2236,6 +2243,153 @@ def cta_extract_series_to_patient(indir, out_dir, info_file):
         out_dwi_series = os.path.join(out_dir, key, 'DWI', dwi_uid)
         cta_extract_dwi_from_raw_dwi_single(dwi_path, out_dwi_series)
 
+def cta_extract_dwi_from_mr_series(indir, outdir):
+    '''
+    note: 该函数为硬编码函数，适应六院CTA2DWI项目，从MR序列中，挑选出DWI序列
+    indir: ../data/gan/hospital_6/ori_neg/5061670/MR
+    outdir: ../data/gan/hospital_6/ori_neg/5061670/DWI
+    '''
+    in_dwi_path = indir
+    in_files1 = glob(os.path.join(in_dwi_path, '*.dcm'))
+    in_files2 = glob(os.path.join(in_dwi_path, '*.DCM'))
+    in_files = in_files1 + in_files2
+    tmp_dwi = []
+    for in_file in in_files:
+        metadata = pydicom.dcmread(in_file)
+        if (metadata.SeriesDescription == 'DWI'):
+            tmp_dwi.append(in_file)
+        else:
+            image_type = metadata.ImageType
+            if ('DIFFUSION' in image_type and 'TRACEW' in image_type and 'ADC' not in image_type):
+                tmp_dwi.append(in_file)
+
+    print('tmp dwi count:\t{}'.format(len(in_dwi_path)))
+
+    os.makedirs(outdir, exist_ok=True)
+    for src_file in tmp_dwi:
+        dst_file = os.path.join(outdir, os.path.basename(src_file))
+        shutil.copyfile(src_file, dst_file)
+            
+    
+
+def cta_extract_series_to_patient_negative_samples(indir, outdir):
+    '''
+    note: 该函数为硬编码函数，为了应对六院CTA2DWI项目中，临时加入的一批30例的纯阴性样本
+
+    对于indir：
+    tree -L 2
+    .
+    ├── 1186129
+    │   ├── CTA
+    │   ├── DWI
+    │   └── NCCT
+    ├── 1285440
+    │   ├── CTA
+    │   ├── MR
+    │   └── NCCT
+    ├── 1397046
+    │   ├── CTA
+    │   ├── MR
+    │   └── NCCT
+    ├── 1507346
+    │   ├── CTA
+    │   ├── MR
+    │   └── NCCT
+    ├── 1532637
+    │   ├── CTA
+    │   ├── MR
+    │   └── NCCT
+    ├── 1713486
+    │   ├── CTA
+    │   ├── MR
+    │   └── NCCT
+    ├── 2350234
+    │   ├── CTA
+    │   ├── MR
+    │   └── NCCT
+    ├── 2389073
+    │   ├── CTA1
+    │   ├── CTA2
+    │   ├── MR
+    │   └── NCCT
+
+    对于输出路径, outdir：
+    .
+    ├── 5015724
+    │   ├── DWI
+    │   │   └── 1.3.12.2.1107.5.2.36.40534.2020032517023837691233304.0.0.0
+    │   └── NCCT
+    │       └── 1.2.840.113704.1.111.15416.1584962121.32
+    ├── 5016897
+    │   ├── DWI
+    │   │   └── 1.3.12.2.1107.5.2.36.40534.2020032712052873077163085.0.0.0
+    │   └── NCCT
+    │       └── 1.2.156.112605.189250946103856.200325022920.3.6208.251228
+    └── 5023941
+        ├── DWI
+        │   └── 1.3.12.2.1107.5.2.36.40534.2020040916392479035839142.0.0.0
+        |           ├── b0
+        |           ├── bxxx
+        |           └── not_dwi
+        │
+        └── NCCT
+            └── 1.2.156.112605.189250946103856.200406031912.3.5724.111797
+
+
+    note: 这个奇葩的路径格式，我们现在挑选的标注是将该目录即(*ori_neg下的每个patientid下的CTA或CTA1目录下的dcm文件*)迁移到*0.raw_dcm_neg目录下对应patientid下的NCCT/序列名*目录下
+    note: 对于DWI执行同样的操作，将*ori_neg下每个patientid下对应的DWI或MR目录下的dcm文件*迁移到*0.raw_dcm_neg目录下对应的patientid下的DWI/序列名/bxxx*目录下，同时建立b0和not_dwi目录
+    indir: ../data/gan/hospital_6/ori_neg
+    outdir: ../data/gan/hospital_6/0.raw_dcm_neg
+
+    debug cmd: cta_extract_series_to_patient_negative_samples('../data/gan/hospital_6/ori_neg', '../data/gan/hospital_6/0.raw_dcm_neg')
+    invoke cmd: python gan_utils.py cta_extract_series_to_patient_negative_samples '../data/gan/hospital_6/ori_neg' '../data/gan/hospital_6/0.raw_dcm_neg'
+    '''
+    
+    def get_series_uid(dcm_dir):
+        in_dwi_path = dcm_dir
+        in_files1 = glob(os.path.join(in_dwi_path, '*.dcm'))
+        in_files2 = glob(os.path.join(in_dwi_path, '*.DCM'))
+        in_files = in_files1 + in_files2
+        in_file = in_files[0]
+        metadata = pydicom.dcmread(in_file)
+        series_uid = metadata.SeriesInstanceUID
+        return series_uid
+    
+    for pid in os.listdir(indir):
+        print('====> processing {}'.format(pid))
+        patient_path = os.path.join(indir, pid)
+        src_cta_path = os.path.join(patient_path, 'CTA')
+        if not os.path.isdir(src_cta_path):
+            src_cta_path = os.path.join(patient_path, 'CTA1')
+            if not os.path.isdir(src_cta_path):
+                continue
+        src_dwi_path = os.path.join(patient_path, 'DWI')
+        if not os.path.isdir(src_dwi_path):
+            src_dwi_path = os.path.join(patient_path, 'MR')
+            if not os.path.isdir(src_dwi_path):
+                continue
+
+        cta_series_uid = get_series_uid(src_cta_path)
+        dwi_series_uid = get_series_uid(src_dwi_path)
+        dst_cta_path = os.path.join(outdir, pid, 'NCCT', cta_series_uid)
+        dst_dwi_path = os.path.join(outdir, pid, 'DWI', dwi_series_uid)
+
+        shutil.copytree(src_cta_path, dst_cta_path)
+
+        dst_dwi_b0_path = os.path.join(dst_dwi_path, 'b0')
+        dst_dwi_bxxx_path = os.path.join(dst_dwi_path, 'bxxx')
+        dst_dwi_not_path = os.path.join(dst_dwi_path, 'not_dwi')
+        
+        # os.makedirs(dst_dwi_b0_path, exist_ok=True)
+        os.makedirs(dst_dwi_not_path, exist_ok=True)
+
+        shutil.copytree(src_dwi_path, dst_dwi_b0_path)
+        shutil.copytree(src_dwi_path, dst_dwi_bxxx_path)
+
+        
+        
+    
+
 
 def cta_split_train_test_according_to_xlsx(info_file, train_config_file, test_config_file, out_file_prefix='anno'):
     '''
@@ -2881,32 +3035,38 @@ def cta_stat_lesion_volume_size(indir):
 
 
 
-def cta_stat_lesion_volume_size_fuckyou(indir):
+def cta_stat_lesion_volume_size_fuckyou(indir, task_index=0):
     '''
     统计标注好的real dwi的病灶区域的体积（单位：ml），输出路径：os.path.join(indir, stat_result_real_dwi.csv)
-    debug cmd: cta_stat_lesion_volume_size('../data/gan/hospital_6')
+    debug cmd: cta_stat_lesion_volume_size_fuckyou('../data/gan/hospital_6')
+    invoke cmd: python gan_utils.py cta_stat_lesion_volume_size_fuckyou '../data/gan/hospital_6' 0
+    invoke cmd: python gan_utils.py cta_stat_lesion_volume_size_fuckyou '../data/gan/hospital_6' 1
+    invoke cmd: python gan_utils.py cta_stat_lesion_volume_size_fuckyou '../data/gan/hospital_6' 2
+    invoke cmd: python gan_utils.py cta_stat_lesion_volume_size_fuckyou '../data/gan/hospital_6' 3
     '''
     raw_ct_dir = os.path.join(indir, '0.raw_dcm')
     annotation_dir = os.path.join(indir, 'annotation')
-    # annotation_dwi_dir = os.path.join(indir, 'annotation', 'real_dwi')
-    # dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
-    # csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2694.csv')
-    # csv_file2 = os.path.join(annotation_dir, 'Series_real DWI.xls')
-
-    # annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi')
-    # dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
-    # csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2695.csv')
-    # csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
-
-    # annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi_liaren_split', '5283')
-    # dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
-    # csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
-    # csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
-
-    annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi_liaren_split', '5284')
-    dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
-    csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
-    csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+    
+    if task_index == 0:
+        annotation_dwi_dir = os.path.join(indir, 'annotation', 'real_dwi')
+        dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+        csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2694.csv')
+        csv_file2 = os.path.join(annotation_dir, 'Series_real DWI.xls')
+    elif task_index == 1:
+        annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi')
+        dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+        csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2695.csv')
+        csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+    elif task_index == 2:
+        annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi_liaren_split', '5283')
+        dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+        csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
+        csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
+    elif task_index == 3:
+        annotation_dwi_dir = os.path.join(indir, 'annotation', 'fake_dwi_liaren_split', '5284')
+        dwi_files = glob(os.path.join(annotation_dwi_dir, '*.mha'))
+        csv_file1 = os.path.join(annotation_dir, 'image_anno_TASK_2823.csv')
+        csv_file2 = os.path.join(annotation_dir, 'Series_virtual DWI.xls')
 
     df1 = pd.read_csv(csv_file1)
     df2 = pd.read_excel(csv_file2)
@@ -2959,11 +3119,16 @@ def cta_stat_lesion_volume_size_fuckyou(indir):
         lesion_volumes.append(lesion_volume)
         row_elems.append(np.array([pid, lesion_volume]))
         # print('{} volume is:\t{}'.format(imageid_to_patientid[patient_id], lesion_volume))
+    
     df = pd.DataFrame(np.array(row_elems), columns=['pid', 'real dwi volumes(ml)'])
-    # df.to_csv(os.path.join(annotation_dir, 'stat_result_real_dwi.csv'))
-    # df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi.csv'))
-    # df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi_5283.csv'))
-    df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi_5284.csv'))
+    if task_index == 0:
+        df.to_csv(os.path.join(annotation_dir, 'stat_result_real_dwi.csv'))
+    elif task_index == 1:
+        df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi.csv'))
+    elif task_index == 2:
+        df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi_5283.csv'))
+    elif task_index == 3:
+        df.to_csv(os.path.join(annotation_dir, 'stat_result_fake_dwi_5284.csv'))
 
 
 
@@ -3128,7 +3293,8 @@ def cta_stat_calc_dice_fuckyou(gt_files, pred_files):
 
 def cta_stat_lesion_volume_dice_fuckyou(indir):
     '''
-    debug cmd: cta_stat_lesion_volume_dice('../data/gan/hospital_6')
+    debug cmd: cta_stat_lesion_volume_dice_fuckyou('../data/gan/hospital_6')
+    invoke cmd: python gan_utils.py cta_stat_lesion_volume_dice_fuckyou '../data/gan/hospital_6'
     '''
     # 找到统一patientid对应的real标注，virtual标注0，virtual标注1，virtual标注2
     annotation_dir = os.path.join(indir, 'annotation')
@@ -3285,7 +3451,7 @@ def test_fire(t_int, t_bool, t_str):
 
 
 if __name__ =='__main__':
-    # fire.Fire()
+    fire.Fire()
     # ncct_extract_infos_from_xlsx('../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # ncct_convert_dcm_to_niigz('../data/gan/ncct2dwi/siyuan_dcm_with_pid', '../data/gan/ncct2dwi/experiment_registration1/raw', '../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # reset_dcm_info('../data/gan/ncct2dwi/siyuan_dcm_with_pid/137611/1.3.12.2.1107.5.1.4.95874.30000016121100222306600009841', '/ssd2/zhangwd/data/brain/gan/ncct2dwi/experiment_registration1/tmp/test3', True)
@@ -3327,5 +3493,9 @@ if __name__ =='__main__':
     # ncct_generate_cerebral_parenchyma_middle_layer_only_onecase('../data/gan/hospital_4_2/experiment_registration2/5 dwi_rigid_align_ncct/486499_first_BS_brain.nii.gz', None)
     # cta_stat_lesion_volume_size_fuckyou('../data/gan/hospital_6')
     # split_cta2dwi_anno_data('../data/gan/hospital_6')
-    cta_stat_lesion_volume_dice_fuckyou('../data/gan/hospital_6')
+    # cta_stat_lesion_volume_dice_fuckyou('../data/gan/hospital_6')
     # cta_stat_calc_dice('../data/gan/hospital_6/annotation/anno_result/2313573.mha', '../data/gan/hospital_6/annotation/anno_result/2396943.mha')
+    # cta_extract_series_to_patient_negative_samples('../data/gan/hospital_6/ori_neg', '../data/gan/hospital_6/0.raw_dcm_neg')
+    # ncct_convert_dcm_to_niigz_multiprocess('../data/gan/hospital_6/0.raw_dcm_neg', '../data/gan/hospital_6/experiment_registration_neg/1.nii_file_neg')
+    # ncct_set_original_point('../data/gan/hospital_6/experiment_registration_neg/1.nii_file_neg', '../data/gan/hospital_6/experiment_registration_neg/2.nii_file_ori')
+    # extract_cerebral_parenchyma_multiprocess('../data/gan/hospital_6/experiment_registration_neg/4 Patient_nii_unity', '../data/gan/hospital_6/experiment_registration_neg/4 Patient_nii_unity', '_NCCT.nii.gz', '_brain.nii.gz')

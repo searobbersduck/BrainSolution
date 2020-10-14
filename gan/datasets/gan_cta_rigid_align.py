@@ -286,8 +286,8 @@ def cta_dwi_multiprocess_main(base_dir):
     num_per_process = (len(moving_files) + process_num - 1)//process_num
 
     for i in range(process_num):
-        sub_ref_files = ref_files[num_per_process*i:min(num_per_process*(i+1), len(ref_files)-1)]
-        sub_moving_files = moving_files[num_per_process*i:min(num_per_process*(i+1), len(moving_files)-1)]
+        sub_ref_files = ref_files[num_per_process*i:min(num_per_process*(i+1), len(ref_files))]
+        sub_moving_files = moving_files[num_per_process*i:min(num_per_process*(i+1), len(moving_files))]
 
         result = pool.apply_async(align_cohort_CT_DWI_single_process, args=(input_dir, output_dir, sub_ref_files, sub_moving_files, additional_file_flag))
         results.append(result)
@@ -299,4 +299,5 @@ def cta_dwi_multiprocess_main(base_dir):
 if __name__ == '__main__':
     # multiprocess_main()
     # singleprocess_main()
-    cta_dwi_multiprocess_main('/ssd2/zhangwd/data/brain/gan/hospital_6_crop/experiment_registration2/')
+    # cta_dwi_multiprocess_main('/ssd2/zhangwd/data/brain/gan/hospital_6_crop/experiment_registration2/')
+    cta_dwi_multiprocess_main('/ssd2/zhangwd/data/brain/gan/hospital_6/experiment_registration_neg/')

@@ -19,3 +19,6 @@
 [submodule "cerebral_parenchyma/external_lib/brain-segmentation-pytorch"]
 	path = cerebral_parenchyma/external_lib/brain-segmentation-pytorch
 	url = https://github.com/searobbersduck/brain-segmentation-pytorch.git
+[submodule "gan/2d/external_lib/pytorch-CycleGAN-and-pix2pix"]
+	path = gan/2d/external_lib/pytorch-CycleGAN-and-pix2pix
+	url = https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix.git

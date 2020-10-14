@@ -1,0 +1,1 @@
+python train_cta_to_dwi_2d.py --dataroot ../../data/tmp --input_nc 1 --output_nc 1 --gpu_ids 6,7 --model pix2pix --netG resnet_6blocks --lambda_L1 2 --n_epochs 10000 --display_id 0 --batch_size 128 --checkpoints_dir ./resnet_6blocks --netD pixel

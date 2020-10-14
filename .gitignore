@@ -14,6 +14,8 @@ __pycache__/
 .vscode
 *.onnx
 
+__pycache__
+
 ct_dual_energy_substraction/itk_algo/config
 ct_dual_energy_substraction/itk_algo/delta
 ct_dual_energy_substraction/itk_algo/test
@@ -41,6 +43,11 @@ gan/tmp
 *.pth
 
 gan/2d/train/checkpoints
+
+gan/2d/train/resnet_6blocks
+gan/2d/train/resnet_9blocks
+gan/2d/train/unet_256
+gan/data/task2
 
 # Distribution / packaging
 .Python
