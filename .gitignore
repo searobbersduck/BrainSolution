@@ -25,6 +25,8 @@ aneurysm_analysis/data
 aneurysm_analysis/train/model
 aneurysm_analysis/train/trails
 
+gan/paper/*
+
 cerebral_parenchyma/data
 
 liver/data
