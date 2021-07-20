@@ -15,7 +15,7 @@
 # python gan_utils.py ncct_generate_cerebral_parenchyma_middle_layer_only_multiprocess '../data/gan/hospital_6_crop/experiment_registration2/5 dwi_rigid_align_ncct' '../data/gan/hospital_6_crop/experiment_registration2/8.1.out/cerebral_parenchyma' *_brain.nii.gz 12
 
 
-# python cta_to_dwi_dataset.py extract_region_by_mask_cut_only_multiprocess '../data/gan/hospital_6_crop/experiment_registration2/8.1.out/cerebral_parenchyma' '../data/gan/hospital_6_crop/experiment_registration2/5 dwi_rigid_align_ncct' '../data/gan/hospital_6_crop/experiment_registration2/8.2.out/NCCT' *brain*.nii.gz *NCCT.nii.gz
+python cta_to_dwi_dataset.py extract_region_by_mask_cut_only_multiprocess '../data/gan/hospital_6_crop/experiment_registration2/8.1.out/cerebral_parenchyma' '../data/gan/hospital_6_crop/experiment_registration2/5 dwi_rigid_align_ncct' '../data/gan/hospital_6_crop/experiment_registration2/8.2.out/NCCT' *brain*.nii.gz *NCCT.nii.gz
 python cta_to_dwi_dataset.py extract_region_by_mask_cut_only_multiprocess '../data/gan/hospital_6_crop/experiment_registration2/8.1.out/cerebral_parenchyma' '../data/gan/hospital_6_crop/experiment_registration2/5 dwi_rigid_align_ncct' '../data/gan/hospital_6_crop/experiment_registration2/8.2.out/DWI_BXXX' *brain*.nii.gz *DWI_BXXX.nii.gz
 python cta_to_dwi_dataset.py extract_region_by_mask_cut_only_multiprocess '../data/gan/hospital_6_crop/experiment_registration2/8.1.out/cerebral_parenchyma' '../data/gan/hospital_6_crop/experiment_registration2/8.1.out/cerebral_parenchyma' '../data/gan/hospital_6_crop/experiment_registration2/8.2.out/cerebral_parenchyma' *brain*.nii.gz *brain.nii.gz
 

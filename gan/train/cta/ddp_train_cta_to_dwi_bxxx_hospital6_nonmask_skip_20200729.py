@@ -29,7 +29,7 @@ class Options():
         self.direction = 'AtoB'
         self.lambda_L1 = 2
         self.epochs = 10000
-        self.num_workers = 0
+        self.num_workers = 4
         self.batch_size = 1
         self.pin_memory = True
         self.display = 2
@@ -42,16 +42,17 @@ class Options():
         self.num_patches_D = 5
         self.patch_size_D = [64, 64, 64]
         # crop_size
-        # self.crop_size = [64, 384, 416]
-        self.crop_size = [32, 64, 64]
+        self.crop_size = [32, 448, 448]
+        # self.crop_size = [32, 64, 64]
         # self.crop_size = [8, 8, 8]
 
         self.root_dir = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out'
         self.config_file = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out/config/anno_mask_ncct_to_dwi_bxxx_train_config_file.txt'
         self.check_point = None
         self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_950_loss_9.0383.pth'
+        self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_20200729/pixel2pixel_netG_epoch_4200_loss_3.4471.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
-        self.netG_model_path = None
+        # self.netG_model_path = None
         self.netD_model_path = None
 
 def train():
@@ -70,7 +71,6 @@ def train():
 
     for epoch_i in range(opt.epochs):
         for index, (src_imgs, dst_imgs, mask_imgs, src_names, dst_names) in enumerate(dataloader):
-            print(index)
             input = {}
             input['A'] = src_imgs
             input['B'] = dst_imgs
@@ -82,12 +82,10 @@ def train():
             gan_model.set_input(input)
             gan_model.optimize_parameters()
 
+            loss_G = gan_model.reduce_tensor(gan_model.loss_G).detach().cpu().numpy()
+            loss_D = gan_model.reduce_tensor(gan_model.loss_D).detach().cpu().numpy()
         
             if local_rank == 0:
-                print('11111')
-                loss_G = gan_model.reduce_tensor(gan_model.loss_G).detach().cpu().numpy()
-                loss_D = gan_model.reduce_tensor(gan_model.loss_D).detach().cpu().numpy()
-                print('22222')
                 # print('loss_G:\t', loss_G)
                 if index%opt.display == 0:
                     print('====> epochs:[{}][{:4d}/{:4d}]\tgan loss:[{:.3f}]\tdiscriminator loss:[{:.3f}]\ttarget files:[{}]'.format(
@@ -95,24 +93,24 @@ def train():
                         loss_D, dst_names
                     ))
 
-            #     if (index%opt.display == 0 and epoch_i%opt.save_interval == 0) or (epoch_i != 0 and epoch_i%100 == 0):
-            #         os.makedirs(opt.intermidiate_result_root, exist_ok=True)
+                if (index%opt.display == 0 and epoch_i%opt.save_interval == 0) or (epoch_i != 0 and epoch_i%100 == 0):
+                    os.makedirs(opt.intermidiate_result_root, exist_ok=True)
 
-            #         writer = sitk.ImageFileWriter()
-            #         writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_src_{}.nii.gz'.format(epoch_i, index, src_names[0].split('.')[0])))
-            #         writer.Execute(sitk.GetImageFromArray(src_imgs.detach().cpu()[0][0].numpy()))
+                    writer = sitk.ImageFileWriter()
+                    writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_src_{}.nii.gz'.format(epoch_i, index, src_names[0].split('.')[0])))
+                    writer.Execute(sitk.GetImageFromArray(src_imgs.detach().cpu()[0][0].numpy()))
 
-            #         writer = sitk.ImageFileWriter()
-            #         writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_dst_real_{}.nii.gz'.format(epoch_i, index, dst_names[0].split('.')[0])))
-            #         writer.Execute(sitk.GetImageFromArray(dst_imgs.detach().cpu()[0][0].numpy()))
+                    writer = sitk.ImageFileWriter()
+                    writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_dst_real_{}.nii.gz'.format(epoch_i, index, dst_names[0].split('.')[0])))
+                    writer.Execute(sitk.GetImageFromArray(dst_imgs.detach().cpu()[0][0].numpy()))
                     
-            #         writer = sitk.ImageFileWriter()
-            #         writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_dst_fake_{}.nii.gz'.format(epoch_i, index, dst_names[0].split('.')[0])))
-            #         # writer.Execute(sitk.GetImageFromArray(gan_model.fake_B.detach().cpu()[0][0].numpy()))
-            #         writer.Execute(sitk.GetImageFromArray(np.array(gan_model.fake_B.detach().cpu()[0][0].numpy(), dtype=np.float32)))
+                    writer = sitk.ImageFileWriter()
+                    writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_dst_fake_{}.nii.gz'.format(epoch_i, index, dst_names[0].split('.')[0])))
+                    # writer.Execute(sitk.GetImageFromArray(gan_model.fake_B.detach().cpu()[0][0].numpy()))
+                    writer.Execute(sitk.GetImageFromArray(np.array(gan_model.fake_B.detach().cpu()[0][0].numpy(), dtype=np.float32)))
                 
-            # if (epoch_i%opt.model_save_interval == 0 and epoch_i > 0):
-            #     gan_model.save_networks(epoch_i)
+                if (epoch_i%opt.model_save_interval == 0 and epoch_i > 0):
+                    gan_model.save_networks(epoch_i)
 
 if __name__ == '__main__':
     train()

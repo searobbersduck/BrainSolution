@@ -22,3 +22,6 @@
 [submodule "gan/2d/external_lib/pytorch-CycleGAN-and-pix2pix"]
 	path = gan/2d/external_lib/pytorch-CycleGAN-and-pix2pix
 	url = https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix.git
+[submodule "CTA2DWI/external_lib/MedCommon"]
+	path = CTA2DWI/external_lib/MedCommon
+	url = https://github.com/searobbersduck/MedCommon.git

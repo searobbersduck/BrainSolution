@@ -8,6 +8,7 @@ from datasets.ncct_gan_dataset import NCCT_GAN_MASK_DS, NCCT_GAN_DS
 from torch.utils.data import DataLoader, Dataset
 
 from models.pixel2pixel_3d_model import Pix2PixModel
+# from models.pixel2pixel_3d_model_amp import Pix2PixModel
 
 from tqdm import tqdm
 
@@ -36,6 +37,7 @@ class Options():
         self.patch_size_D = [64, 64, 64]
         # crop_size
         self.crop_size = [32, 448, 448]
+        # self.crop_size = [32, 64, 64]
         # self.crop_size = [8, 8, 8]
 
         self.root_dir = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out'

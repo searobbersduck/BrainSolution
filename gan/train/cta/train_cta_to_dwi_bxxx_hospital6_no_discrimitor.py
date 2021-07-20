@@ -1,8 +1,10 @@
+
 import os
 import sys
-sys.path.append('../')
-sys.path.append('../../')
+sys.path.append(os.path.join(os.path.dirname(__file__), os.path.pardir))
+sys.path.append(os.path.join(os.path.dirname(__file__), os.path.pardir, os.path.pardir))
 import numpy as np
+
 
 import torch
 import torch.nn as nn
@@ -11,19 +13,15 @@ import torch.distributed as dist
 from datasets.ncct_gan_dataset import NCCT_GAN_MASK_DS, NCCT_GAN_DS
 from torch.utils.data import DataLoader, Dataset
 
-from models.pixel2pixel_3d_model_amp_dist import Pix2PixModel
-# from models.pixel2pixel_3d_model import Pix2PixModel
+from models.pixel2pixel_3d_model_no_d import Pix2PixModel
+# from models.pixel2pixel_3d_model_amp import Pix2PixModel
 
 from tqdm import tqdm
 
 import SimpleITK as sitk
 import time
 
-
-# from prefetch_generator import BackgroundGenerator
-
 torch.distributed.init_process_group('nccl')
-
 
 class Options():
     def __init__(self):
@@ -32,53 +30,46 @@ class Options():
         self.gan_mode = 'lsgan'
         self.direction = 'AtoB'
         self.lambda_L1 = 2
-        self.epochs = 1000
-        self.num_workers = 8
+        self.epochs = 10000
+        self.num_workers = 4
         self.batch_size = 1
         self.pin_memory = True
         self.display = 2
         self.save_interval = 10
         self.model_save_interval = 25
-        self.intermidiate_result_root = '../../data/gan/hospital_6/experiment_registration2/8.2.out/train_result/intermidiate_result_{}'.format(__file__.split('.')[0])
-        self.save_dir = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_{}'.format(__file__.split('.')[0])
+        self.intermidiate_result_root = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out/train_result/intermidiate_result_{}'.format(__file__.split('.')[0])
+        self.save_dir = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_{}'.format(__file__.split('.')[0])
         # add patch discriminator
         self.patch_D = False
         self.num_patches_D = 5
         self.patch_size_D = [64, 64, 64]
         # crop_size
-        # self.crop_size = [64, 416, 416]
-        self.crop_size = [32, 64, 64]
+        self.crop_size = [64, 416, 416]
+        # self.crop_size = [32, 64, 64]
+        # self.crop_size = [8, 8, 8]
 
-        self.root_dir = '../../data/gan/hospital_6/experiment_registration2/8.2.out'
-        self.config_file = '../../data/gan/hospital_6/experiment_registration2/8.2.out/config/anno_mask_ncct_to_dwi_bxxx_train_config_file.txt'
+        self.root_dir = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out'
+        self.config_file = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out/config/anno_mask_ncct_to_dwi_bxxx_train_config_file.txt'
         self.check_point = None
-        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_950_loss_9.0383.pth'
-
-        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_20200520/pixel2pixel_netG_epoch_925_loss_6.8274.pth'
-        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_20200520/pixel2pixel_netG_epoch_900_loss_5.5809.pth'
-        self.netG_model_path = '../../data/gan/hospital_6/experiment_registration2/9.2.model_out/model_ddp_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_20200520/pixel2pixel_netG_epoch_0_loss_12.0792.pth'
+        self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_950_loss_9.0383.pth'
+        self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_no_discrimitor/pixel2pixel_netG_epoch_200_loss_5.0601.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
-        self.netG_model_path = None
+        # self.netG_model_path = None
         self.netD_model_path = None
 
-# # data prefetch loader.
-# class DataLoaderX(DataLoader):
-#     def __iter__(self):
-#         return BackgroundGenerator(super().__iter__())
+
 
 def train():
     opt = Options()
     ds = NCCT_GAN_MASK_DS(opt.root_dir, 
     opt.config_file, 
     'train', opt.crop_size, opt.crop_size, debug=False)
-    sampler = torch.utils.data.distributed.DistributedSampler(ds)
-    
-    dataloader = DataLoader(ds, batch_size=opt.batch_size, sampler=sampler)
+    dataloader = DataLoader(ds, num_workers=opt.num_workers, batch_size=opt.batch_size, pin_memory=True, shuffle=True)
 
     gan_model = Pix2PixModel(opt)
 
-    local_rank = torch.distributed.get_rank()
-    print(len(dataloader))
+    local_rank = gan_model.local_rank
+
     for epoch_i in range(opt.epochs):
         for index, (src_imgs, dst_imgs, mask_imgs, src_names, dst_names) in enumerate(dataloader):
             input = {}
@@ -92,16 +83,18 @@ def train():
             gan_model.set_input(input)
             gan_model.optimize_parameters()
 
+            loss_G = gan_model.reduce_tensor(gan_model.loss_G).detach().cpu().numpy()
+
             if local_rank == 0:
-                loss_G = gan_model.reduce_tensor(gan_model.loss_G).detach().cpu().numpy()
-                loss_D = gan_model.reduce_tensor(gan_model.loss_D).detach().cpu().numpy()
                 # print('loss_G:\t', loss_G)
                 if index%opt.display == 0:
                     print('====> epochs:[{}][{:4d}/{:4d}]\tgan loss:[{:.3f}]\tdiscriminator loss:[{:.3f}]\ttarget files:[{}]'.format(
                         epoch_i, index, len(dataloader), loss_G, 
-                        loss_D, dst_names
+                        loss_G, dst_names
                     ))
-
+                if (epoch_i%opt.model_save_interval == 0 and epoch_i > 0):
+                    gan_model.save_networks(epoch_i)
+                
                 if (index%opt.display == 0 and epoch_i%opt.save_interval == 0) or (epoch_i != 0 and epoch_i%100 == 0):
                     os.makedirs(opt.intermidiate_result_root, exist_ok=True)
 
@@ -117,9 +110,8 @@ def train():
                     writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_dst_fake_{}.nii.gz'.format(epoch_i, index, dst_names[0].split('.')[0])))
                     # writer.Execute(sitk.GetImageFromArray(gan_model.fake_B.detach().cpu()[0][0].numpy()))
                     writer.Execute(sitk.GetImageFromArray(np.array(gan_model.fake_B.detach().cpu()[0][0].numpy(), dtype=np.float32)))
-                
-            if (epoch_i%opt.model_save_interval == 0 and epoch_i>0):
-                gan_model.save_networks(epoch_i)
+
+
 
 if __name__ == '__main__':
     train()

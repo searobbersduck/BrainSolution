@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 LastEditors: searobbersanduck
-LastEditTime: 2020-08-21 09:30:06
+LastEditTime: 2020-12-09 10:21:38
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -1409,9 +1409,6 @@ def extract_cerebral_parenchyma_onecase(infile, outdir, inpattern='_NCCT.nii.gz'
     out_img.SetSpacing(spc)
     out_file = os.path.join(outdir, os.path.basename(infile).replace(inpattern, outpattern))
     sitk.WriteImage(out_img, out_file)
-    
-
-
 
 def extract_cerebral_parenchyma_singletask(infiles, outdir, inpattern='_NCCT.nii.gz', outpattern='_brain.nii.gz'):
     for infile in tqdm(infiles):
@@ -1442,7 +1439,214 @@ def extract_cerebral_parenchyma_multiprocess(indir, outdir, inpattern='_NCCT.nii
     # extract_cerebral_parenchyma_singletask(infiles, outdir, inpattern, outpattern)
 
 
+# 提取脑实质mask的bbox， 并打印记录信息
+def common_extract_mask_bbox(infile):
+    '''
+    infile: '../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity/5023941_first_BS_brain_mask.nii.gz'
+    
+    debug cmd: common_extract_mask_bbox('../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity/5023941_first_BS_brain_mask.nii.gz')
+    '''
+    sitk_mask = sitk.ReadImage(infile)
+    sitk_mask = sitk.Cast(sitk_mask, sitk.sitkUInt8)
+    sitk_connect_componet = sitk.ConnectedComponent(sitk_mask)
+    statsFilter = sitk.LabelIntensityStatisticsImageFilter()
+    statsFilter.Execute(sitk_connect_componet, sitk_mask)
+    areas = []
+    labels = []
+    bboxs = []
+    for label in statsFilter.GetLabels():
+        bbox = statsFilter.GetBoundingBox(label)
+        area = statsFilter.GetNumberOfPixels(label)
+        bboxs.append(bbox)
+        labels.append(label)
+        areas.append(area)
+    print('====> {}'.format(os.path.basename(infile)), bboxs)
+    return bboxs[0]
 
+# 批量计算脑实质区域的bbox大小
+def cta_extract_mask_bbox(indir, pattern):
+    '''
+    indir: '../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity'
+    pattern: '*brain_mask*.nii.gz'
+    debug cmd: cta_extract_mask_bbox('../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity', '*brain_mask*.nii.gz')
+    
+    该示例的输出结果如下所示：
+    ====> 2107733_first_BS_brain_mask.nii.gz [(118, 87, 0, 278, 335, 180)]
+    ====> 1480215_first_BS_brain_mask.nii.gz [(112, 84, 0, 320, 355, 185)]
+    ====> 3906343_first_BS_brain_mask.nii.gz [(102, 87, 0, 306, 362, 141)]
+    ====> 4581690_first_BS_brain_mask.nii.gz [(142, 132, 0, 211, 233, 180)]
+    ====> 3736505_first_BS_brain_mask.nii.gz [(139, 119, 0, 238, 272, 210)]
+    ====> 2009568_first_BS_brain_mask.nii.gz [(170, 133, 0, 220, 273, 147)]
+    ====> 4531141_first_BS_brain_mask.nii.gz [(101, 87, 0, 277, 314, 318)]
+    ====> 4465419_first_BS_brain_mask.nii.gz [(61, 125, 0, 291, 296, 164)]
+    ====> 2491689_first_BS_brain_mask.nii.gz [(112, 67, 0, 295, 370, 195)]
+    ====> 3949254_first_BS_brain_mask.nii.gz [(137, 83, 0, 215, 237, 177)]
+    ====> 4196642_first_BS_brain_mask.nii.gz [(107, 114, 0, 280, 321, 189)]
+    ====> 3784996_first_BS_brain_mask.nii.gz [(133, 140, 0, 216, 253, 206)]
+    ====> 3833955_first_BS_brain_mask.nii.gz [(155, 139, 0, 199, 250, 203)]
+    ====> 4490737_first_BS_brain_mask.nii.gz [(148, 106, 0, 202, 256, 172)]
+    ====> 1014186_first_BS_brain_mask.nii.gz [(87, 111, 0, 244, 289, 293)]
+    ====> 1902661_first_BS_brain_mask.nii.gz [(153, 124, 0, 204, 262, 188)]
+    ====> 4550519_first_BS_brain_mask.nii.gz [(184, 76, 0, 236, 290, 176)]
+    ====> 4730391_first_BS_brain_mask.nii.gz [(119, 109, 0, 243, 319, 173)]
+    ====> 1117782_first_BS_brain_mask.nii.gz [(148, 134, 0, 192, 244, 156)]
+    ====> 4552561_first_BS_brain_mask.nii.gz [(121, 114, 0, 216, 267, 170)]
+    ====> 4577418_first_BS_brain_mask.nii.gz [(89, 137, 0, 335, 317, 269)]
+    ====> 2741782_first_BS_brain_mask.nii.gz [(127, 106, 0, 204, 253, 190)]
+    ====> 1712912_first_BS_brain_mask.nii.gz [(102, 122, 0, 300, 297, 173)]
+    ====> 4440733_first_BS_brain_mask.nii.gz [(149, 100, 0, 219, 263, 172)]
+    ====> 4669297_first_BS_brain_mask.nii.gz [(97, 126, 0, 234, 257, 170)]
+    ====> 4285331_first_BS_brain_mask.nii.gz [(147, 104, 0, 248, 304, 279)]
+    ====> 3924933_first_BS_brain_mask.nii.gz [(76, 84, 0, 267, 315, 172)]
+    ====> 4440093_first_BS_brain_mask.nii.gz [(120, 93, 0, 273, 333, 250)]
+    ====> 1035948_first_BS_brain_mask.nii.gz [(158, 141, 0, 207, 249, 204)]
+    ====> 4813227_first_BS_brain_mask.nii.gz [(177, 148, 0, 163, 205, 267)]
+    ====> 2452420_first_BS_brain_mask.nii.gz [(72, 53, 0, 322, 367, 198)]
+    ====> 4299369_first_BS_brain_mask.nii.gz [(101, 107, 0, 280, 308, 170)]
+    ====> 1935168_first_BS_brain_mask.nii.gz [(82, 61, 0, 331, 396, 192)]
+    ====> 3869885_first_BS_brain_mask.nii.gz [(43, 34, 0, 321, 390, 166)]
+    ====> 4452790_first_BS_brain_mask.nii.gz [(83, 48, 0, 313, 408, 208)]
+    ====> 4697856_first_BS_brain_mask.nii.gz [(91, 49, 0, 308, 379, 184)]
+    ====> 4451397_first_BS_brain_mask.nii.gz [(150, 144, 0, 201, 221, 192)]
+    ====> 4503839_first_BS_brain_mask.nii.gz [(131, 125, 0, 199, 239, 161)]
+    ====> 4853010_first_BS_brain_mask.nii.gz [(141, 171, 0, 219, 239, 181)]
+    ====> 1077997_first_BS_brain_mask.nii.gz [(132, 111, 0, 264, 310, 164)]
+    ====> 5014850_first_BS_brain_mask.nii.gz [(161, 143, 0, 235, 272, 168)]
+    ====> 4238407_first_BS_brain_mask.nii.gz [(92, 124, 0, 325, 349, 276)]
+    ====> 4765366_first_BS_brain_mask.nii.gz [(129, 100, 0, 270, 334, 295)]
+    ====> 4185501_first_BS_brain_mask.nii.gz [(127, 157, 0, 183, 219, 170)]
+    ====> 4023857_first_BS_brain_mask.nii.gz [(125, 103, 0, 235, 291, 159)]
+    ====> 2999343_first_BS_brain_mask.nii.gz [(123, 134, 0, 284, 278, 168)]
+    ====> 2602401_first_BS_brain_mask.nii.gz [(69, 99, 0, 244, 290, 161)]
+    ====> 4119126_first_BS_brain_mask.nii.gz [(109, 91, 0, 279, 332, 188)]
+    ====> 2454141_first_BS_brain_mask.nii.gz [(100, 108, 0, 319, 347, 205)]
+    ====> 1792160_first_BS_brain_mask.nii.gz [(159, 115, 0, 240, 270, 173)]
+    ====> 3987577_first_BS_brain_mask.nii.gz [(82, 45, 0, 321, 376, 294)]
+    ====> 4203734_first_BS_brain_mask.nii.gz [(119, 184, 0, 218, 242, 176)]
+    ====> 4738025_first_BS_brain_mask.nii.gz [(169, 143, 0, 197, 229, 161)]
+    ====> 3998837_first_BS_brain_mask.nii.gz [(125, 83, 0, 210, 254, 165)]
+    ====> 2954952_first_BS_brain_mask.nii.gz [(117, 106, 0, 301, 311, 142)]
+    ====> 4504652_first_BS_brain_mask.nii.gz [(141, 132, 0, 207, 257, 278)]
+    ====> 4049711_first_BS_brain_mask.nii.gz [(85, 108, 0, 273, 308, 186)]
+    ====> 4594148_first_BS_brain_mask.nii.gz [(155, 121, 0, 206, 255, 171)]
+    ====> 3220683_first_BS_brain_mask.nii.gz [(69, 94, 0, 289, 340, 277)]
+    ====> 4641052_first_BS_brain_mask.nii.gz [(46, 93, 0, 317, 355, 152)]
+    ====> 1445543_first_BS_brain_mask.nii.gz [(132, 161, 0, 216, 234, 201)]
+    ====> 3466686_first_BS_brain_mask.nii.gz [(130, 25, 0, 311, 405, 191)]
+    ====> 4407255_first_BS_brain_mask.nii.gz [(122, 114, 0, 232, 274, 170)]
+    ====> 2835569_first_BS_brain_mask.nii.gz [(166, 110, 0, 278, 285, 164)]
+    ====> 3666059_first_BS_brain_mask.nii.gz [(71, 29, 0, 312, 422, 234)]
+    ====> 1686783_first_BS_brain_mask.nii.gz [(118, 123, 0, 230, 297, 185)]
+    ====> 3873500_first_BS_brain_mask.nii.gz [(136, 121, 0, 250, 274, 194)]
+    ====> 2998848_first_BS_brain_mask.nii.gz [(87, 49, 0, 320, 395, 261)]
+    ====> 4797646_first_BS_brain_mask.nii.gz [(149, 117, 0, 228, 269, 171)]
+    ====> 5016897_first_BS_brain_mask.nii.gz [(231, 147, 0, 199, 236, 176)]
+    ====> 5023941_first_BS_brain_mask.nii.gz [(187, 161, 0, 176, 214, 179)]
+    ====> 4504615_first_BS_brain_mask.nii.gz [(171, 137, 0, 187, 224, 287)]
+    ====> 3101695_first_BS_brain_mask.nii.gz [(127, 74, 0, 280, 338, 166)]
+    ====> 3034178_first_BS_brain_mask.nii.gz [(172, 133, 0, 210, 261, 164)]
+    ====> 3874653_first_BS_brain_mask.nii.gz [(144, 109, 0, 242, 275, 212)]
+    ====> 4962062_first_BS_brain_mask.nii.gz [(119, 130, 0, 283, 292, 181)]
+    ====> 4890509_first_BS_brain_mask.nii.gz [(134, 115, 0, 247, 261, 171)]
+    ====> 3901698_first_BS_brain_mask.nii.gz [(100, 130, 0, 233, 288, 170)]
+    ====> 2504214_first_BS_brain_mask.nii.gz [(85, 111, 0, 257, 304, 167)]
+    ====> 4014155_first_BS_brain_mask.nii.gz [(149, 67, 0, 248, 327, 174)]
+    ====> 1264255_first_BS_brain_mask.nii.gz [(140, 132, 0, 244, 281, 171)]
+    ====> 4614953_first_BS_brain_mask.nii.gz [(119, 123, 0, 259, 315, 175)]
+    ====> 4386552_first_BS_brain_mask.nii.gz [(74, 48, 0, 326, 411, 181)]
+    ====> 4304964_first_BS_brain_mask.nii.gz [(121, 112, 0, 211, 272, 171)]
+    ====> 2813431_first_BS_brain_mask.nii.gz [(154, 128, 0, 204, 245, 200)]
+    ====> 3617570_first_BS_brain_mask.nii.gz [(111, 148, 0, 221, 258, 165)]
+    ====> 4402594_first_BS_brain_mask.nii.gz [(140, 105, 0, 273, 345, 276)]
+    ====> 4587103_first_BS_brain_mask.nii.gz [(77, 119, 0, 240, 282, 187)]
+    ====> 4634411_first_BS_brain_mask.nii.gz [(136, 105, 0, 209, 204, 176)]
+    ====> 4223392_first_BS_brain_mask.nii.gz [(135, 105, 0, 261, 280, 274)]
+    ====> 4226455_first_BS_brain_mask.nii.gz [(120, 105, 0, 230, 285, 194)]
+    ====> 4646244_first_BS_brain_mask.nii.gz [(137, 117, 0, 236, 291, 163)]
+    ====> 4692992_first_BS_brain_mask.nii.gz [(106, 145, 0, 218, 267, 178)]
+    ====> 2690480_first_BS_brain_mask.nii.gz [(88, 54, 0, 314, 386, 285)]
+    ====> 2094368_first_BS_brain_mask.nii.gz [(95, 78, 0, 293, 355, 210)]
+    ====> 4123153_first_BS_brain_mask.nii.gz [(98, 45, 0, 308, 383, 169)]
+    ====> 4366985_first_BS_brain_mask.nii.gz [(123, 98, 0, 260, 321, 182)]
+    ====> 2717578_first_BS_brain_mask.nii.gz [(128, 149, 0, 224, 264, 171)]
+    ====> 5002780_first_BS_brain_mask.nii.gz [(185, 109, 0, 219, 285, 180)]
+    ====> 1502032_first_BS_brain_mask.nii.gz [(143, 138, 0, 225, 231, 197)]
+    ====> 4597717_first_BS_brain_mask.nii.gz [(88, 134, 0, 272, 261, 203)]
+    ====> 4835944_first_BS_brain_mask.nii.gz [(177, 38, 0, 258, 302, 165)]
+    ====> 5015724_first_BS_brain_mask.nii.gz [(131, 128, 0, 234, 261, 187)]
+    ====> 4298912_first_BS_brain_mask.nii.gz [(119, 99, 0, 252, 315, 270)]
+    ====> 2670896_first_BS_brain_mask.nii.gz [(101, 84, 0, 296, 329, 231)]
+    ====> 4407082_first_BS_brain_mask.nii.gz [(168, 142, 0, 189, 234, 178)]
+    ====> 4618890_first_BS_brain_mask.nii.gz [(104, 92, 0, 290, 311, 184)]
+    ====> 4017198_first_BS_brain_mask.nii.gz [(123, 116, 0, 229, 266, 201)]
+    ====> 4962823_first_BS_brain_mask.nii.gz [(200, 78, 0, 296, 350, 169)]
+    ====> 4646191_first_BS_brain_mask.nii.gz [(139, 130, 0, 210, 259, 176)]
+    ====> 4527569_first_BS_brain_mask.nii.gz [(145, 120, 0, 260, 299, 172)]
+    ====> 4291274_first_BS_brain_mask.nii.gz [(94, 108, 0, 273, 311, 176)]
+    ====> 3837491_first_BS_brain_mask.nii.gz [(100, 94, 0, 273, 311, 271)]
+    ====> 4750385_first_BS_brain_mask.nii.gz [(136, 103, 0, 241, 288, 270)]
+    ====> 4624787_first_BS_brain_mask.nii.gz [(141, 169, 0, 208, 220, 180)]
+    ====> 4157025_first_BS_brain_mask.nii.gz [(164, 138, 0, 204, 241, 165)]
+    ====> 4804837_first_BS_brain_mask.nii.gz [(123, 119, 0, 265, 283, 184)]
+    ====> 4984637_first_BS_brain_mask.nii.gz [(89, 34, 0, 319, 372, 191)]
+    ====> 4062211_first_BS_brain_mask.nii.gz [(126, 97, 0, 221, 283, 175)]
+    ====> 1616503_first_BS_brain_mask.nii.gz [(81, 62, 0, 313, 378, 284)]
+    ====> 4260454_first_BS_brain_mask.nii.gz [(157, 142, 0, 214, 251, 184)]
+    ====> 3331290_first_BS_brain_mask.nii.gz [(98, 112, 0, 248, 294, 182)]
+    ====> 4677636_first_BS_brain_mask.nii.gz [(102, 118, 0, 234, 290, 166)]
+    ====> 1231754_first_BS_brain_mask.nii.gz [(132, 101, 0, 233, 280, 172)]
+    ====> 4781742_first_BS_brain_mask.nii.gz [(90, 86, 0, 310, 320, 189)]
+    ====> 3839904_first_BS_brain_mask.nii.gz [(76, 94, 0, 299, 341, 178)]
+    ====> 5014734_first_BS_brain_mask.nii.gz [(119, 95, 0, 208, 226, 173)]
+    ====> 1291454_first_BS_brain_mask.nii.gz [(143, 105, 0, 233, 293, 200)]
+    ====> 1959911_first_BS_brain_mask.nii.gz [(146, 89, 0, 216, 305, 175)]
+    ====> 4495700_first_BS_brain_mask.nii.gz [(115, 95, 0, 283, 310, 261)]
+    ====> 5001653_first_BS_brain_mask.nii.gz [(36, 82, 0, 344, 339, 159)]
+    ====> 1614005_first_BS_brain_mask.nii.gz [(149, 116, 0, 287, 334, 193)]
+    ====> 4381668_first_BS_brain_mask.nii.gz [(167, 154, 0, 190, 213, 165)]
+    ====> 4140286_first_BS_brain_mask.nii.gz [(111, 126, 0, 236, 260, 197)]
+    ====> 2083121_first_BS_brain_mask.nii.gz [(119, 83, 0, 277, 343, 294)]
+    ====> 3705107_first_BS_brain_mask.nii.gz [(110, 118, 0, 240, 286, 178)]
+    ====> 3902268_first_BS_brain_mask.nii.gz [(161, 124, 0, 192, 238, 204)]
+    ====> 4457593_first_BS_brain_mask.nii.gz [(85, 90, 0, 309, 330, 194)]
+    ====> 4303024_first_BS_brain_mask.nii.gz [(142, 144, 0, 235, 256, 171)]
+    ====> 4246235_first_BS_brain_mask.nii.gz [(111, 113, 0, 269, 309, 284)]
+    ====> 1358935_first_BS_brain_mask.nii.gz [(143, 117, 0, 248, 305, 165)]
+    ====> 2182657_first_BS_brain_mask.nii.gz [(89, 70, 0, 302, 299, 228)]
+    ====> 1029629_first_BS_brain_mask.nii.gz [(137, 103, 0, 261, 311, 198)]
+    ====> 2326328_first_BS_brain_mask.nii.gz [(82, 65, 0, 339, 393, 172)]
+    ====> 4728962_first_BS_brain_mask.nii.gz [(84, 54, 0, 327, 378, 203)]
+    ====> 4582240_first_BS_brain_mask.nii.gz [(79, 74, 0, 305, 360, 281)]
+    ====> 2942930_first_BS_brain_mask.nii.gz [(155, 146, 0, 203, 209, 182)]
+    ====> 4043283_first_BS_brain_mask.nii.gz [(117, 127, 0, 215, 243, 169)]
+    ====> 1305155_first_BS_brain_mask.nii.gz [(149, 135, 0, 196, 246, 177)]
+    ====> 1237062_first_BS_brain_mask.nii.gz [(154, 107, 0, 299, 352, 188)]
+    ====> 1477909_first_BS_brain_mask.nii.gz [(122, 98, 0, 278, 318, 188)]
+    ====> 3942366_first_BS_brain_mask.nii.gz [(113, 82, 0, 305, 366, 174)]
+    ====> 4600198_first_BS_brain_mask.nii.gz [(147, 80, 0, 284, 357, 180)]
+    ====> 4055500_first_BS_brain_mask.nii.gz [(137, 121, 0, 227, 271, 175)]
+    ====> 4338621_first_BS_brain_mask.nii.gz [(127, 111, 0, 250, 275, 184)]
+    ====> 4455178_first_BS_brain_mask.nii.gz [(163, 133, 0, 200, 236, 178)]
+    ====> 2006878_first_BS_brain_mask.nii.gz [(150, 113, 0, 223, 291, 175)]
+    ====> 4848080_first_BS_brain_mask.nii.gz [(102, 89, 0, 307, 370, 174)]
+    ====> 4981609_first_BS_brain_mask.nii.gz [(145, 120, 0, 218, 250, 176)]
+    ====> 3772244_first_BS_brain_mask.nii.gz [(91, 131, 0, 266, 283, 237)]
+    ====> 2693475_first_BS_brain_mask.nii.gz [(138, 166, 0, 211, 240, 180)]
+    ====> 4479986_first_BS_brain_mask.nii.gz [(143, 133, 0, 235, 259, 170)]
+    max range: 344, 422, 318
+    '''
+    max_w = 0
+    max_h = 0
+    max_d = 0
+    mask_files = glob(os.path.join(indir, pattern))
+    for mask_file in mask_files:
+        bbox = common_extract_mask_bbox(mask_file)
+        w, h, d = bbox[3:]
+        max_w = max(max_w, w)
+        max_h = max(max_h, h)
+        max_d = max(max_d, d)
+    print('max range: {}, {}, {}'.format(max_w, max_h, max_d))
+    
 
 # 提取脑实质部分的mask, 所有层面都按照最大层进行mask运算
 def ncct_generate_cerebral_parenchyma(indir, outdir, inpattern):
@@ -3451,7 +3655,7 @@ def test_fire(t_int, t_bool, t_str):
 
 
 if __name__ =='__main__':
-    fire.Fire()
+    # fire.Fire()
     # ncct_extract_infos_from_xlsx('../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # ncct_convert_dcm_to_niigz('../data/gan/ncct2dwi/siyuan_dcm_with_pid', '../data/gan/ncct2dwi/experiment_registration1/raw', '../data/gan/ncct2dwi/experiment_registration1/config/V1 四院NCCT-DWI-ADC-RAPID.xlsx')
     # reset_dcm_info('../data/gan/ncct2dwi/siyuan_dcm_with_pid/137611/1.3.12.2.1107.5.1.4.95874.30000016121100222306600009841', '/ssd2/zhangwd/data/brain/gan/ncct2dwi/experiment_registration1/tmp/test3', True)
@@ -3499,3 +3703,5 @@ if __name__ =='__main__':
     # ncct_convert_dcm_to_niigz_multiprocess('../data/gan/hospital_6/0.raw_dcm_neg', '../data/gan/hospital_6/experiment_registration_neg/1.nii_file_neg')
     # ncct_set_original_point('../data/gan/hospital_6/experiment_registration_neg/1.nii_file_neg', '../data/gan/hospital_6/experiment_registration_neg/2.nii_file_ori')
     # extract_cerebral_parenchyma_multiprocess('../data/gan/hospital_6/experiment_registration_neg/4 Patient_nii_unity', '../data/gan/hospital_6/experiment_registration_neg/4 Patient_nii_unity', '_NCCT.nii.gz', '_brain.nii.gz')
+    # common_extract_mask_bbox('../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity/5023941_first_BS_brain_mask.nii.gz')
+    cta_extract_mask_bbox('../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity', '*brain_mask*.nii.gz')

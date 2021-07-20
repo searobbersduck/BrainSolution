@@ -85,8 +85,9 @@ def calc_metrics_all_2d(indir, outdir):
         psnr, ssim, mse, nrmse, mae, min_v, max_v = calc_metrics_one_case(real_dwi_file, fake_dwi_file)
         row_elems.append(np.array([pid, psnr, ssim, mse, nrmse, mae, min_v, max_v]))
     df = pd.DataFrame(np.array(row_elems), columns=['pid', 'psnr', 'ssim', 'mse', 'nrmse', 'mae', 'min_v', 'max_v'])
-    df.to_csv('./cta2dwi_metrics_norm_2d.csv')
+    df.to_csv('./cta2dwi_metrics_norm_2d_1015.csv')
 
 if __name__ == '__main__':
     # calc_metrics_all('../data/gan/hospital_6/experiment_registration2/10.predict_retain', None)
-    calc_metrics_all_2d('../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp', None)
+    # calc_metrics_all_2d('../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp', None)
+    calc_metrics_all_2d('../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp_1015', None)

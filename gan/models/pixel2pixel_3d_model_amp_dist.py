@@ -3,8 +3,8 @@
 @Version: 1.0
 @Autor: searobbersanduck
 @Date: 2020-03-30 15:44:31
-@LastEditors: searobbersanduck
-@LastEditTime: 2020-06-08 15:51:21
+LastEditors: searobbersanduck
+LastEditTime: 2020-10-20 17:52:13
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -369,7 +369,7 @@ class Pix2PixModel():
         else:
             real_AB = torch.cat((self.real_A*self.mask, self.real_B*self.mask), 1)
         with torch.cuda.amp.autocast():
-            pred_real = self.netD(real_AB)
+            pred_real = self.netD(real_AB.detach())
             self.loss_D_real = self.criterionGAN(pred_real, True)
             # combine loss and calculate gradients
             self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
@@ -424,7 +424,7 @@ class Pix2PixModel():
         self.forward()                   # compute fake images: G(A)
         # update D
         self.set_requires_grad(self.netD, True)  # enable backprop for D
-        self.optimizer_D.zero_grad()     # set D's gradients to zero
+        # self.optimizer_D.zero_grad()     # set D's gradients to zero
         self.backward_D()                # calculate gradients for D
         # self.optimizer_D.step()          # update D's weights
         self.scaler.step(self.optimizer_D)
@@ -433,7 +433,7 @@ class Pix2PixModel():
         # update D patches
         if self.opt.patch_D:
             self.set_requires_grad(self.netD_P, True)  # enable backprop for D
-            self.optimizer_D_P.zero_grad()  # set D's gradients to zero
+            # self.optimizer_D_P.zero_grad()  # set D's gradients to zero
             self.backward_D_P()  # calculate gradients for D
             self.optimizer_D_P.step()  # update D's weights
         
@@ -441,7 +441,7 @@ class Pix2PixModel():
         self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
         if self.opt.patch_D:
             self.set_requires_grad(self.netD_P, False)
-        self.optimizer_G.zero_grad()        # set G's gradients to zero
+        # self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
         # self.optimizer_G.step()             # udpate G's weights
         self.scaler.step(self.optimizer_G)
@@ -458,6 +458,9 @@ class Pix2PixModel():
         Parameters:
             epoch (int) -- current epoch; used in the file name '%s_net_%s.pth' % (epoch, name)
         """
+        # loss_G = self.reduce_tensor(self.loss_G).detach().cpu().numpy()
+        # loss_D = self.reduce_tensor(self.loss_D).detach().cpu().numpy()
+        
         netG_out_model_file = 'pixel2pixel_netG_epoch_{}_loss_{:.4f}.pth'.format(epoch, self.loss_G.detach().cpu().numpy())
         torch.save(self.netG.module.state_dict(), 
             os.path.join(self.save_dir, netG_out_model_file))

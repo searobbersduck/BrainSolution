@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-03-30 15:44:31
 LastEditors: searobbersanduck
-LastEditTime: 2020-09-30 16:57:52
+LastEditTime: 2020-10-20 16:51:20
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -279,6 +279,7 @@ class Pix2PixModel():
         self.netD = self.netD_cpu.to(self.device)
         self.netG = torch.nn.parallel.DistributedDataParallel(self.netG, device_ids=[local_rank], output_device=local_rank)
         self.netD = torch.nn.parallel.DistributedDataParallel(self.netD, device_ids=[local_rank], output_device=local_rank)
+        self.scaler = torch.cuda.amp.GradScaler()
 
 
     def set_requires_grad(self, nets, requires_grad=False):
@@ -321,7 +322,8 @@ class Pix2PixModel():
         self.netG.train()
         self.netD.train()
         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-        self.fake_B = self.netG(self.real_A)  # G(A)
+        with torch.cuda.amp.autocast():
+            self.fake_B = self.netG(self.real_A)  # G(A)
 
         # add patch(block) discriminator calculate 
         # related params: patch_D(bool), num_patches_D(int), patch_size_D([z,y,x])
@@ -362,19 +364,21 @@ class Pix2PixModel():
         else:
             fake_AB = torch.cat((self.real_A*self.mask, self.fake_B*self.mask), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
         # fake_AB_c = fake_AB.clone()
-        pred_fake = self.netD(fake_AB.detach())
-        # pred_fake = self.netD(fake_AB_c.detach())
-        self.loss_D_fake = self.criterionGAN(pred_fake, False)
+        with torch.cuda.amp.autocast():
+            pred_fake = self.netD(fake_AB.detach())
+            # pred_fake = self.netD(fake_AB_c.detach())
+            self.loss_D_fake = self.criterionGAN(pred_fake, False)
         # Real
         if self.mask is None:
             real_AB = torch.cat((self.real_A, self.real_B), 1)
         else:
             real_AB = torch.cat((self.real_A*self.mask, self.real_B*self.mask), 1)
-        pred_real = self.netD(real_AB.detach())
-        self.loss_D_real = self.criterionGAN(pred_real, True)
-        # combine loss and calculate gradients
-        self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
-        self.loss_D.backward()
+        with torch.cuda.amp.autocast():
+            pred_real = self.netD(real_AB.detach())
+            self.loss_D_real = self.criterionGAN(pred_real, True)
+            # combine loss and calculate gradients
+            self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
+        self.scaler.scale(self.loss_D).backward()
 
 
     def backward_D_P(self):
@@ -419,7 +423,7 @@ class Pix2PixModel():
             self.loss_G_L1 = self.criterionL1(self.fake_B*self.mask, self.real_B*self.mask) * self.opt.lambda_L1
         # combine loss and calculate gradients
         self.loss_G = self.loss_G_GAN + self.loss_G_L1
-        self.loss_G.backward()
+        self.scaler.scale(self.loss_G).backward()
         
     def optimize_parameters(self):
         self.forward()                   # compute fake images: G(A)
@@ -428,6 +432,8 @@ class Pix2PixModel():
         self.optimizer_D.zero_grad()     # set D's gradients to zero
         self.backward_D()                # calculate gradients for D
         self.optimizer_D.step()          # update D's weights
+        self.scaler.step(self.optimizer_D)
+        self.scaler.update()
         
         # update D patches
         if self.opt.patch_D:
@@ -443,6 +449,8 @@ class Pix2PixModel():
         self.optimizer_G.zero_grad()        # set G's gradients to zero
         self.backward_G()                   # calculate graidents for G
         self.optimizer_G.step()             # udpate G's weights
+        self.scaler.step(self.optimizer_G)
+        self.scaler.update()
         
         # print(self.loss_G)
         # print(self.loss_D)

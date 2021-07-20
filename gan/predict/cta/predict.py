@@ -192,6 +192,54 @@ def batch_convert_niigz_jpg(indir, outdir):
 
 
 
+def batch_convert_niigz_jpg_3d_2d(indir, outdir):
+    '''
+    .
+    ├── CTA
+    ├── FAKE_DWI
+    ├── FAKE_DWI_2D
+    └── REAL_DWI
+
+    '''
+    os.makedirs(outdir, exist_ok=True)
+    ct_pattern = '_first_BS_NCCT.nii.gz'
+    fake_pattern = '_first_BS_NCCT_fake.nii.gz'
+    real_pattern = '_first_FU_DWI_BXXX.nii.gz'
+    fake_2d_pattern = '_first_BS_NCCT_fake_2d.nii.gz'
+    fake_list = glob(os.path.join(indir, 'FAKE_DWI', '*{}*'.format(fake_pattern)))
+    patient_ids = [os.path.basename(i).split('_')[0] for i in fake_list]
+    for patient_id in tqdm(patient_ids):
+        ct_file = os.path.join(indir, 'CTA', '{}{}'.format(patient_id, ct_pattern))
+        fake_file = os.path.join(indir, 'FAKE_DWI', '{}{}'.format(patient_id, fake_pattern))
+        fake_2d_file = os.path.join(indir, 'FAKE_DWI_2D', '{}{}'.format(patient_id, fake_2d_pattern))
+        real_file = os.path.join(indir, 'REAL_DWI', '{}{}'.format(patient_id, real_pattern))
+        sub_outdir = os.path.join(outdir, patient_id)
+        os.makedirs(sub_outdir, exist_ok=True)
+        fake_img = sitk.ReadImage(fake_file)
+        fake_2d_img = sitk.ReadImage(fake_2d_file)
+        real_img = sitk.ReadImage(real_file)
+        ct_img = sitk.ReadImage(ct_file)
+        fake_arr = sitk.GetArrayFromImage(fake_img)
+        fake_2d_arr = sitk.GetArrayFromImage(fake_2d_img)
+        real_arr = sitk.GetArrayFromImage(real_img)
+        ct_arr = sitk.GetArrayFromImage(ct_img)
+        z_len = real_arr.shape[0]
+        for j in range(z_len):
+            sub_fake_file = os.path.join(sub_outdir, '{}_{}_fake_3d.jpg'.format(patient_id, j))
+            sub_fake_2d_file = os.path.join(sub_outdir, '{}_{}_fake_2d.jpg'.format(patient_id, j))
+            sub_real_file = os.path.join(sub_outdir, '{}_{}_real.jpg'.format(patient_id, j))
+            sub_ct_file = os.path.join(sub_outdir, '{}_{}_ct.jpg'.format(patient_id, j))
+
+            # cv2.imwrite(sub_fake_file, fake_arr[j])
+            # cv2.imwrite(sub_real_file, real_arr[j])
+            # cv2.imwrite(sub_ct_file, ct_arr[j])
+            save_ct_img(fake_arr[j], sub_fake_file, 400, 200)
+            save_ct_img(fake_2d_arr[j], sub_fake_2d_file, 400, 200)
+            save_ct_img(real_arr[j], sub_real_file, 400, 200)
+            save_ct_img(ct_arr[j], sub_ct_file)
+
+
+
 if __name__ == '__main__':
     # predict('../../data/gan/hospital_4/experiment_registration2/5 dwi_rigid_align_ncct/114093_first_BS_NCCT.nii.gz', '../../data/gan/hospital_4/experiment_registration2/10.predict')
     # predict('../../data/gan/hospital_4/experiment_registration2/8.out/NCCT/448646_first_BS_NCCT.nii.gz', '../../data/gan/hospital_4/experiment_registration2/10.predict')
@@ -206,12 +254,13 @@ if __name__ == '__main__':
     # batch_predict_cta('../../data/gan/hospital_6/experiment_registration3/8.2.out', '../../data/gan/hospital_6/experiment_registration3/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_6/experiment_registration3/10.predict')
     # batch_convert_niigz_jpg('../../data/gan/hospital_6/experiment_registration3/10.predict', '../../data/gan/hospital_6/experiment_registration3/10.predict_jpg')
     
-    batch_predict_cta('../../data/gan/hospital_6_crop/experiment_registration2/8.2.out', '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out/config/anno_mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_6_crop/experiment_registration2/10.predict_4.9019')
+    # batch_predict_cta('../../data/gan/hospital_6_crop/experiment_registration2/8.2.out', '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out/config/anno_mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_6_crop/experiment_registration2/10.predict_4.9019')
     # batch_convert_niigz_jpg('../../data/gan/hospital_6/experiment_registration3/10.predict', '../../data/gan/hospital_6/experiment_registration3/10.predict_jpg')
 
     # batch_predict_cta('../../data/gan/hospital_6/experiment_registration_neg/8.2.out', '../../data/gan/hospital_6/experiment_registration_neg/8.2.out/config/mask_ncct_to_dwi_bxxx_train_config_file.txt', '../../data/gan/hospital_6/experiment_registration_neg/10.predict')
     # batch_predict_cta('../../data/gan/hospital_6/experiment_registration_neg/8.2.out', '../../data/gan/hospital_6/experiment_registration_neg/8.2.out/config/mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_6/experiment_registration_neg/10.predict')
     # batch_convert_niigz_jpg('../../data/gan/hospital_6/experiment_registration_neg/10.predict', '../../data/gan/hospital_6/experiment_registration_neg/10.predict_jpg')
+    batch_convert_niigz_jpg_3d_2d('../../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp_1015', '../../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp_1015_jpg')
 
 
 

@@ -11,7 +11,8 @@ import torch.distributed as dist
 from datasets.ncct_gan_dataset import NCCT_GAN_MASK_DS, NCCT_GAN_DS
 from torch.utils.data import DataLoader, Dataset
 
-from models.pixel2pixel_3d_model_dist import Pix2PixModel
+# from models.pixel2pixel_3d_model_dist import Pix2PixModel
+from models.pixel2pixel_3d_model_amp_dist import Pix2PixModel
 
 from tqdm import tqdm
 
@@ -41,8 +42,8 @@ class Options():
         self.num_patches_D = 5
         self.patch_size_D = [64, 64, 64]
         # crop_size
-        # self.crop_size = [32, 416, 416]
         self.crop_size = [32, 416, 416]
+        # self.crop_size = [64, 64, 64]
         # self.crop_size = [8, 8, 8]
 
         self.root_dir = '../../data/gan/hospital_6_crop/experiment_registration2/8.2.out'
@@ -51,7 +52,7 @@ class Options():
         self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_20200508/pixel2pixel_netG_epoch_950_loss_9.0383.pth'
         self.netG_model_path = '../../data/gan/hospital_6_crop/experiment_registration2/9.2.model_out/model_train_cta_to_dwi_bxxx_hospital6_nonmask_skip_20200729/pixel2pixel_netG_epoch_4200_loss_3.4471.pth'
         # self.netD_model_path = '../../data/gan/ncct2dwi/experiment_registration2/9.model_out/model_train_ncct_to_dwi_bxxx_20200421/pixel2pixel_netD_epoch_100_loss_0.2630.pth'
-        # self.netG_model_path = None
+        self.netG_model_path = None
         self.netD_model_path = None
 
 def train():
@@ -86,18 +87,15 @@ def train():
                     end = time.time()
                     # print('Time elapsed {}'.format(end-beg))
                     beg = end
-                    loss_G = gan_model.reduce_tensor(gan_model.loss_G)
-                    # print(loss_G.item())
-                    # print('====> epochs:[{}][{:4d}/{:4d}]\tgan loss:[{:.3f}]\tdiscriminator loss:[{:.3f}]\ttarget files:[{}]'.format(
-                    #     epoch_i, index, len(dataloader), gan_model.loss_G.detach().cpu().numpy(), 
-                    #     gan_model.loss_D.detach().cpu().numpy(), dst_names
-                    # ))
-                    print('====> epochs:[{}][{:4d}/{:4d}]\tgan loss:[{:.3f}]\tdiscriminator loss:[{:.3f}]\tperception loss:[{:3f}\t{:3f}\t{:3f}]\ttarget files:[{}]'.format(
-                        epoch_i, index, len(dataloader), gan_model.loss_G.detach().cpu().numpy(), 
-                        gan_model.loss_D.detach().cpu().numpy(), gan_model.criterion_perception_loss.loss_axial, gan_model.criterion_perception_loss.loss_coronal, 
-                        gan_model.criterion_perception_loss.loss_sagital, dst_names
+                loss_G = gan_model.reduce_tensor(gan_model.loss_G).detach().cpu().numpy()
+                loss_D = gan_model.reduce_tensor(gan_model.loss_D).detach().cpu().numpy()
+                # print('loss_G:\t', loss_G)
+                if index%opt.display == 0:
+                    print('====> epochs:[{}][{:4d}/{:4d}]\tgan loss:[{:.3f}]\tdiscriminator loss:[{:.3f}]\ttarget files:[{}]'.format(
+                        epoch_i, index, len(dataloader), loss_G, 
+                        loss_D, dst_names
                     ))
-                if ((index%opt.display == 0 and epoch_i%opt.save_interval == 0) or (epoch_i != 0 and epoch_i%100 == 0)) and (gan_model.criterion_perception_loss.loss_axial > 1000):
+                if ((index%opt.display == 0 and epoch_i%opt.save_interval == 0) or (epoch_i != 0 and epoch_i%100 == 0)):
                     os.makedirs(opt.intermidiate_result_root, exist_ok=True)
 
                     writer = sitk.ImageFileWriter()
@@ -110,7 +108,8 @@ def train():
                     
                     writer = sitk.ImageFileWriter()
                     writer.SetFileName(os.path.join(opt.intermidiate_result_root, 'epoch_{}_index_{}_dst_fake_{}.nii.gz'.format(epoch_i, index, dst_names[0].split('.')[0])))
-                    writer.Execute(sitk.GetImageFromArray(gan_model.fake_B.detach().cpu()[0][0].numpy()))
+                    # writer.Execute(sitk.GetImageFromArray(gan_model.fake_B.detach().cpu()[0][0].numpy()))
+                    writer.Execute(sitk.GetImageFromArray(np.array(gan_model.fake_B.detach().cpu()[0][0].numpy(), dtype=np.float32)))
             
         if (epoch_i%opt.model_save_interval == 0) and local_rank == 0:
             gan_model.save_networks(epoch_i)

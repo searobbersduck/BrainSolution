@@ -210,4 +210,4 @@ if __name__ == '__main__':
     # train()
     # predict_onecase('../../data/gan/hospital_6/experiment_registration2/8.2.out/NCCT/1014186_first_BS_NCCT.nii.gz', '../../data/gan/hospital_6/experiment_registration2/8.2.out/DWI_BXXX/1014186_first_FU_DWI_BXXX.nii.gz', '../../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp')
     # predict_singletask('../../data/gan/hospital_6/experiment_registration2/8.2.out', '../../data/gan/hospital_6/experiment_registration2/8.2.out/config/anno_mask_ncct_to_dwi_bxxx_test_config_file.txt', '../../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp')
-    predict_singletask2('../../data/gan/hospital_6/experiment_registration2/10.predict_retain', '../../data/gan/hospital_6/experiment_registration2/10.predict_retain/CTA', '../../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp')
+    predict_singletask2('../../data/gan/hospital_6/experiment_registration2/10.predict_retain', '../../data/gan/hospital_6/experiment_registration2/10.predict_retain/CTA', '../../data/gan/hospital_6/experiment_registration2/8.2.out/slice_2d/tmp_1015')
