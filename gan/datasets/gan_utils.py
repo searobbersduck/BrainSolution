@@ -4,7 +4,7 @@
 @Autor: searobbersanduck
 @Date: 2020-04-09 09:52:50
 LastEditors: searobbersanduck
-LastEditTime: 2020-12-09 10:21:38
+LastEditTime: 2021-07-20 15:38:27
 @License : (C)Copyright 2020-2021, MIT
 '''
 
@@ -1437,6 +1437,44 @@ def extract_cerebral_parenchyma_multiprocess(indir, outdir, inpattern='_NCCT.nii
     pool.join()
 
     # extract_cerebral_parenchyma_singletask(infiles, outdir, inpattern, outpattern)
+
+
+def extract_cerebral_parenchyma_multicenter_singletask(indir, outdir, pids, inpattern='CTA.nii.gz', outpattern='_brain.nii.gz'):
+    for pid in tqdm(pids):
+        try:
+            infile = os.path.join(indir, pid, inpattern)
+            out_sub_dir = os.path.join(outdir, pid)
+            os.makedirs(out_sub_dir, exist_ok=True)
+            extract_cerebral_parenchyma_onecase(infile, out_sub_dir, inpattern, outpattern)
+        except Exception as e:
+            print('====> Error case:\t', pid)
+            print(e)
+            pass
+    
+
+def extract_cerebral_parenchyma_multicenter_multiprocess(indir, outdir, inpattern='_NCCT.nii.gz', outpattern='_brain.nii.gz', process_num=6):
+    
+    # infiles = glob(os.path.join(indir, '*{}'.format(inpattern)))
+    infiles = os.listdir(indir)
+
+    import multiprocessing
+    from multiprocessing import Process
+    multiprocessing.freeze_support()
+
+    pool = multiprocessing.Pool()
+    results = []
+
+    num_per_process = (len(infiles) + process_num - 1)//process_num
+
+    for i in range(process_num):
+        sub_infiles = infiles[num_per_process*i:min(num_per_process*(i+1), len(infiles))]
+        print(sub_infiles)
+        result = pool.apply_async(extract_cerebral_parenchyma_multicenter_singletask, args=(indir, outdir, sub_infiles, inpattern, outpattern))
+        results.append(result)
+
+    pool.close()
+    pool.join()
+
 
 
 # 提取脑实质mask的bbox， 并打印记录信息
@@ -3704,4 +3742,5 @@ if __name__ =='__main__':
     # ncct_set_original_point('../data/gan/hospital_6/experiment_registration_neg/1.nii_file_neg', '../data/gan/hospital_6/experiment_registration_neg/2.nii_file_ori')
     # extract_cerebral_parenchyma_multiprocess('../data/gan/hospital_6/experiment_registration_neg/4 Patient_nii_unity', '../data/gan/hospital_6/experiment_registration_neg/4 Patient_nii_unity', '_NCCT.nii.gz', '_brain.nii.gz')
     # common_extract_mask_bbox('../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity/5023941_first_BS_brain_mask.nii.gz')
-    cta_extract_mask_bbox('../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity', '*brain_mask*.nii.gz')
+    # cta_extract_mask_bbox('../data/gan/hospital_6_crop/experiment_registration2/4 Patient_nii_unity', '*brain_mask*.nii.gz')
+    extract_cerebral_parenchyma_multicenter_multiprocess('/data/medical/brain/gan/cta2dwi_history_pos/3.sorted_nii', '/data/medical/brain/gan/cta2dwi_history_pos/3.sorted_mask', inpattern='CTA.nii.gz', outpattern='_brain.nii.gz', process_num=6)
